@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { bestTimes, getNetworkName } from '@/data/mockData';
 import { NetworkBadge } from '@/components/ui/NetworkBadge';
-import { useNetworks } from '@/hooks/useNetworks';
+import { useSocialConnections, useDisconnectSocial, getOAuthUrl } from '@/hooks/useSocialConnections';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { 
   User, 
@@ -16,7 +18,9 @@ import {
   Shield, 
   Palette,
   Check,
-  ExternalLink
+  ExternalLink,
+  Loader2,
+  AlertTriangle
 } from 'lucide-react';
 import {
   Dialog,
@@ -26,6 +30,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 
 const settingsSections = [
   { id: 'profile', label: 'Perfil', icon: User },
@@ -36,9 +45,20 @@ const settingsSections = [
   { id: 'appearance', label: 'Aparência', icon: Palette },
 ];
 
+const availableNetworks = [
+  { id: 'instagram', name: 'Instagram', description: 'Conta Business ou Creator vinculada a Página do Facebook' },
+  { id: 'facebook', name: 'Facebook', description: 'Publicação em Páginas do Facebook' },
+  { id: 'twitter', name: 'Twitter/X', description: 'Publicação de tweets via API v2' },
+  { id: 'linkedin', name: 'LinkedIn', description: 'Publicação no perfil profissional' },
+] as const;
+
 export default function Settings() {
   const { toast } = useToast();
-  const { networks, connectNetwork, disconnectNetwork } = useNetworks();
+  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { data: connections, isLoading: loadingConnections } = useSocialConnections();
+  const disconnectSocial = useDisconnectSocial();
+  
   const [activeSection, setActiveSection] = useState('profile');
   const [notifications, setNotifications] = useState({
     postPublished: true,
@@ -46,9 +66,29 @@ export default function Settings() {
     weeklyReport: true,
     tips: false,
   });
-  const [connectDialogOpen, setConnectDialogOpen] = useState(false);
-  const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
-  const [username, setUsername] = useState('');
+  const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
+  const [oauthInfoOpen, setOauthInfoOpen] = useState(false);
+  const [selectedNetworkForOAuth, setSelectedNetworkForOAuth] = useState<string | null>(null);
+
+  // Check for OAuth callback results
+  useEffect(() => {
+    const connected = searchParams.get('connected');
+    const error = searchParams.get('error');
+    
+    if (connected) {
+      toast({
+        title: "Rede conectada!",
+        description: `${getNetworkName(connected as any)} foi conectado com sucesso.`,
+      });
+    } else if (error) {
+      toast({
+        title: "Erro na conexão",
+        description: decodeURIComponent(error),
+        variant: "destructive"
+      });
+    }
+  }, [searchParams, toast]);
 
   const handleSave = () => {
     toast({
@@ -57,30 +97,50 @@ export default function Settings() {
     });
   };
 
-  const handleConnect = () => {
-    if (selectedNetwork && username.trim()) {
-      connectNetwork(selectedNetwork, username.trim());
+  const handleConnect = (network: string) => {
+    setSelectedNetworkForOAuth(network);
+    setOauthInfoOpen(true);
+  };
+
+  const startOAuth = () => {
+    if (selectedNetworkForOAuth) {
+      // In production, this would redirect to the OAuth URL
+      // For now, show a message about configuration needed
       toast({
-        title: "Rede conectada!",
-        description: `${getNetworkName(networks.find(n => n.id === selectedNetwork)?.network || 'instagram')} conectado com sucesso.`,
+        title: "Configuração necessária",
+        description: "Para conectar redes sociais, configure as credenciais OAuth nas configurações do projeto.",
+        variant: "destructive"
       });
-      setConnectDialogOpen(false);
-      setUsername('');
-      setSelectedNetwork(null);
+      setOauthInfoOpen(false);
+      
+      // Uncomment when OAuth is configured:
+      // window.location.href = getOAuthUrl(selectedNetworkForOAuth);
     }
   };
 
-  const handleDisconnect = (networkId: string, networkName: string) => {
-    disconnectNetwork(networkId);
-    toast({
-      title: "Rede desconectada",
-      description: `${networkName} foi desconectado.`,
-    });
+  const handleDisconnect = async () => {
+    if (!selectedConnectionId) return;
+    
+    try {
+      await disconnectSocial.mutateAsync(selectedConnectionId);
+      toast({
+        title: "Rede desconectada",
+        description: "A conta foi desconectada com sucesso.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível desconectar a rede.",
+        variant: "destructive"
+      });
+    } finally {
+      setDisconnectDialogOpen(false);
+      setSelectedConnectionId(null);
+    }
   };
 
-  const openConnectDialog = (networkId: string) => {
-    setSelectedNetwork(networkId);
-    setConnectDialogOpen(true);
+  const getConnectionForNetwork = (network: string) => {
+    return connections?.find(c => c.network === network);
   };
 
   return (
@@ -135,11 +195,11 @@ export default function Settings() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="text-sm text-foreground mb-1.5 block">Nome</Label>
-                      <Input defaultValue="Usuário Agendasaas" className="bg-muted/30 border-border" />
+                      <Input defaultValue={user?.user_metadata?.full_name || 'Usuário'} className="bg-muted/30 border-border" />
                     </div>
                     <div>
                       <Label className="text-sm text-foreground mb-1.5 block">Email</Label>
-                      <Input defaultValue="usuario@email.com" className="bg-muted/30 border-border" />
+                      <Input defaultValue={user?.email || ''} className="bg-muted/30 border-border" disabled />
                     </div>
                   </div>
                   <Button onClick={handleSave}>Salvar Alterações</Button>
@@ -151,60 +211,84 @@ export default function Settings() {
             {activeSection === 'networks' && (
               <div className="bg-card rounded-2xl border border-border p-6">
                 <h2 className="text-lg font-semibold text-foreground mb-4">Redes Sociais</h2>
+                
+                <Alert className="mb-4 border-primary/30 bg-primary/5">
+                  <AlertTriangle className="h-4 w-4 text-primary" />
+                  <AlertTitle className="text-primary">Configuração OAuth Necessária</AlertTitle>
+                  <AlertDescription className="text-muted-foreground">
+                    Para conectar redes sociais, você precisa configurar os Apps OAuth de cada plataforma 
+                    (Meta Developer, Twitter Developer, LinkedIn Developer) e adicionar as credenciais como secrets.
+                  </AlertDescription>
+                </Alert>
+                
                 <p className="text-sm text-muted-foreground mb-4">
-                  Conecte suas redes sociais para começar a agendar posts
+                  Conecte suas contas para agendar publicações
                 </p>
-                <div className="space-y-4">
-                  {networks.map(network => (
-                    <div 
-                      key={network.id}
-                      className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border"
-                    >
-                      <div className="flex items-center gap-4">
-                        <NetworkBadge network={network.network} size="md" showLabel={false} />
-                        <div>
-                          <div className="font-medium text-foreground">{getNetworkName(network.network)}</div>
-                          {network.connected && network.username && (
-                            <div className="text-sm text-muted-foreground">
-                              @{network.username} • {network.followers.toLocaleString()} seguidores
+                
+                {loadingConnections ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {availableNetworks.map(network => {
+                      const connection = getConnectionForNetwork(network.id);
+                      const isConnected = !!connection;
+                      
+                      return (
+                        <div 
+                          key={network.id}
+                          className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border"
+                        >
+                          <div className="flex items-center gap-4">
+                            <NetworkBadge network={network.id as any} size="md" showLabel={false} />
+                            <div>
+                              <div className="font-medium text-foreground">{network.name}</div>
+                              {isConnected && connection.account_username ? (
+                                <div className="text-sm text-muted-foreground">
+                                  @{connection.account_username}
+                                </div>
+                              ) : (
+                                <div className="text-sm text-muted-foreground">
+                                  {network.description}
+                                </div>
+                              )}
                             </div>
-                          )}
-                          {!network.connected && (
-                            <div className="text-sm text-muted-foreground">
-                              Não conectado
-                            </div>
-                          )}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {isConnected ? (
+                              <>
+                                <span className="flex items-center gap-1 text-sm text-green-500">
+                                  <Check className="w-4 h-4" />
+                                  Conectado
+                                </span>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedConnectionId(connection.id);
+                                    setDisconnectDialogOpen(true);
+                                  }}
+                                >
+                                  Desconectar
+                                </Button>
+                              </>
+                            ) : (
+                              <Button 
+                                size="sm" 
+                                className="gap-2"
+                                onClick={() => handleConnect(network.id)}
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                                Conectar
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {network.connected ? (
-                          <>
-                            <span className="flex items-center gap-1 text-sm text-green-500">
-                              <Check className="w-4 h-4" />
-                              Conectado
-                            </span>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleDisconnect(network.id, getNetworkName(network.network))}
-                            >
-                              Desconectar
-                            </Button>
-                          </>
-                        ) : (
-                          <Button 
-                            size="sm" 
-                            className="gap-2"
-                            onClick={() => openConnectDialog(network.id)}
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                            Conectar
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -331,30 +415,67 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Connect Dialog */}
-      <Dialog open={connectDialogOpen} onOpenChange={setConnectDialogOpen}>
+      {/* OAuth Info Dialog */}
+      <Dialog open={oauthInfoOpen} onOpenChange={setOauthInfoOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Conectar Rede Social</DialogTitle>
+            <DialogTitle>Conectar {selectedNetworkForOAuth && getNetworkName(selectedNetworkForOAuth as any)}</DialogTitle>
             <DialogDescription>
-              Digite seu nome de usuário para conectar sua conta
+              Você será redirecionado para autorizar o acesso à sua conta.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Label className="text-sm text-foreground mb-1.5 block">Nome de usuário</Label>
-            <Input
-              placeholder="@seu_usuario"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="bg-muted/30 border-border"
-            />
+            <p className="text-sm text-muted-foreground mb-4">
+              Ao conectar sua conta, você autoriza o Agendasaas a:
+            </p>
+            <ul className="text-sm text-muted-foreground space-y-2">
+              <li className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-primary" />
+                Publicar conteúdo em seu nome
+              </li>
+              <li className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-primary" />
+                Acessar informações básicas do perfil
+              </li>
+              <li className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-primary" />
+                Acessar métricas de engajamento
+              </li>
+            </ul>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConnectDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setOauthInfoOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleConnect} disabled={!username.trim()}>
-              Conectar
+            <Button onClick={startOAuth}>
+              Continuar com OAuth
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Disconnect Confirmation Dialog */}
+      <Dialog open={disconnectDialogOpen} onOpenChange={setDisconnectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Desconectar Rede</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja desconectar esta conta? Posts agendados para esta rede não serão publicados.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDisconnectDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDisconnect}
+              disabled={disconnectSocial.isPending}
+            >
+              {disconnectSocial.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : null}
+              Desconectar
             </Button>
           </DialogFooter>
         </DialogContent>

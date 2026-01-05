@@ -8,14 +8,19 @@ import {
   Settings, 
   Menu, 
   X,
-  Zap
+  Zap,
+  ClipboardList,
+  LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
+import { useScheduledPosts } from '@/hooks/useScheduledPosts';
 
 const navItems = [
   { icon: Calendar, label: 'Calendário', path: '/' },
   { icon: PenSquare, label: 'Criar Post', path: '/criar' },
+  { icon: ClipboardList, label: 'Agendamentos', path: '/agendamentos' },
   { icon: Image, label: 'Biblioteca', path: '/biblioteca' },
   { icon: BarChart3, label: 'Analytics', path: '/analytics' },
   { icon: Settings, label: 'Configurações', path: '/configuracoes' },
@@ -24,6 +29,14 @@ const navItems = [
 export function Sidebar() {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const { signOut, user } = useAuth();
+  const { data: posts } = useScheduledPosts();
+  
+  const scheduledCount = posts?.filter(p => p.status === 'scheduled').length || 0;
+
+  const handleLogout = async () => {
+    await signOut();
+  };
 
   return (
     <>
@@ -88,13 +101,28 @@ export function Sidebar() {
 
           {/* Stats footer */}
           <div className="border-t border-sidebar-border pt-4 mt-4">
-            <div className="bg-sidebar-accent rounded-xl p-4">
+            <div className="bg-sidebar-accent rounded-xl p-4 mb-4">
               <div className="text-sm text-muted-foreground mb-2">Posts agendados</div>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-primary">12</span>
-                <span className="text-xs text-muted-foreground">esta semana</span>
+                <span className="text-2xl font-bold text-primary">{scheduledCount}</span>
+                <span className="text-xs text-muted-foreground">pendentes</span>
               </div>
             </div>
+            
+            {user && (
+              <div className="px-2">
+                <p className="text-xs text-muted-foreground truncate mb-2">{user.email}</p>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sair
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </aside>

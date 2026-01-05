@@ -4,11 +4,15 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { NetworksProvider } from "./hooks/useNetworks";
+import { AuthProvider } from "./hooks/useAuth";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import Index from "./pages/Index";
 import CreatePost from "./pages/CreatePost";
 import MediaLibrary from "./pages/MediaLibrary";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
+import Schedules from "./pages/Schedules";
+import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -16,20 +20,24 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <NetworksProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/criar" element={<CreatePost />} />
-            <Route path="/biblioteca" element={<MediaLibrary />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/configuracoes" element={<Settings />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </NetworksProvider>
+      <AuthProvider>
+        <NetworksProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+              <Route path="/criar" element={<ProtectedRoute><CreatePost /></ProtectedRoute>} />
+              <Route path="/agendamentos" element={<ProtectedRoute><Schedules /></ProtectedRoute>} />
+              <Route path="/biblioteca" element={<ProtectedRoute><MediaLibrary /></ProtectedRoute>} />
+              <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+              <Route path="/configuracoes" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </NetworksProvider>
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
