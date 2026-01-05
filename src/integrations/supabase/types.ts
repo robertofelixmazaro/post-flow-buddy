@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      media_files: {
+        Row: {
+          created_at: string
+          file_path: string
+          folder: string
+          id: string
+          name: string
+          size: number
+          type: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_path: string
+          folder?: string
+          id?: string
+          name: string
+          size: number
+          type?: string
+          url: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_path?: string
+          folder?: string
+          id?: string
+          name?: string
+          size?: number
+          type?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       post_logs: {
         Row: {
           created_at: string
