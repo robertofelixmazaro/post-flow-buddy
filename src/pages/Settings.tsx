@@ -112,7 +112,10 @@ export default function Settings() {
             {/* Networks */}
             {activeSection === 'networks' && (
               <div className="bg-card rounded-2xl border border-border p-6">
-                <h2 className="text-lg font-semibold text-foreground mb-4">Redes Sociais Conectadas</h2>
+                <h2 className="text-lg font-semibold text-foreground mb-4">Redes Sociais</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Conecte suas redes sociais para começar a agendar posts
+                </p>
                 <div className="space-y-4">
                   {connectedNetworks.map(network => (
                     <div 
@@ -122,10 +125,17 @@ export default function Settings() {
                       <div className="flex items-center gap-4">
                         <NetworkBadge network={network.network} size="md" showLabel={false} />
                         <div>
-                          <div className="font-medium text-foreground">{network.username}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {network.followers.toLocaleString()} seguidores
-                          </div>
+                          <div className="font-medium text-foreground">{getNetworkName(network.network)}</div>
+                          {network.connected && network.username && (
+                            <div className="text-sm text-muted-foreground">
+                              {network.username} • {network.followers.toLocaleString()} seguidores
+                            </div>
+                          )}
+                          {!network.connected && (
+                            <div className="text-sm text-muted-foreground">
+                              Não conectado
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
