@@ -1,10 +1,20 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { useMediaFiles, useUploadMedia, useDeleteMedia, useUpdateMediaTags, useReplaceMediaFile, MediaFile } from '@/hooks/useMediaFiles';
+import { Progress } from '@/components/ui/progress';
+import { 
+  useMediaFiles, 
+  useUploadMedia, 
+  useUploadMultipleMedia,
+  useDeleteMedia, 
+  useUpdateMediaTags, 
+  useReplaceMediaFile, 
+  useRenameMedia,
+  MediaFile 
+} from '@/hooks/useMediaFiles';
 import { VideoPreviewDialog } from '@/components/media/VideoPreviewDialog';
 import { ImageEditorDialog } from '@/components/media/ImageEditorDialog';
 import { TagsManager, TagsFilter } from '@/components/media/TagsManager';
@@ -25,7 +35,9 @@ import {
   Plus,
   Play,
   Edit,
-  Tag
+  Tag,
+  FileUp,
+  Pencil
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -40,6 +52,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import {
   Select,
@@ -68,8 +81,12 @@ export default function MediaLibrary({ selectionMode = false, onSelect, onClose 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [uploadFolder, setUploadFolder] = useState('Todos');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadFolder, setUploadFolder] = useState('Banners');
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  
+  // Drag and drop state
+  const [isDragging, setIsDragging] = useState(false);
   
   // Video preview state
   const [videoPreviewOpen, setVideoPreviewOpen] = useState(false);
@@ -79,11 +96,18 @@ export default function MediaLibrary({ selectionMode = false, onSelect, onClose 
   const [imageEditorOpen, setImageEditorOpen] = useState(false);
   const [editingImage, setEditingImage] = useState<MediaFile | null>(null);
 
+  // Rename state
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [renamingFile, setRenamingFile] = useState<MediaFile | null>(null);
+  const [newFileName, setNewFileName] = useState('');
+
   const { data: mediaFiles = [], isLoading } = useMediaFiles();
   const uploadMedia = useUploadMedia();
+  const uploadMultiple = useUploadMultipleMedia();
   const deleteMedia = useDeleteMedia();
   const updateTags = useUpdateMediaTags();
   const replaceMedia = useReplaceMediaFile();
+  const renameMedia = useRenameMedia();
 
   // Get all unique tags from media files
   const allTags = useMemo(() => {
@@ -104,32 +128,84 @@ export default function MediaLibrary({ selectionMode = false, onSelect, onClose 
   const imageCount = mediaFiles.filter(f => f.type === 'image').length;
   const videoCount = mediaFiles.filter(f => f.type === 'video').length;
 
+  // Drag and drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.currentTarget === e.target) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files).filter(
+      file => file.type.startsWith('image/') || file.type.startsWith('video/')
+    );
+
+    if (files.length > 0) {
+      setSelectedFiles(files);
+      setUploadDialogOpen(true);
+    }
+  }, []);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setSelectedFiles(files);
       setUploadDialogOpen(true);
     }
   };
 
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    if (selectedFiles.length === 0) return;
 
     try {
-      await uploadMedia.mutateAsync({ file: selectedFile, folder: uploadFolder });
+      setUploadProgress(0);
+      
+      if (selectedFiles.length === 1) {
+        await uploadMedia.mutateAsync({ file: selectedFiles[0], folder: uploadFolder });
+      } else {
+        // Simulate progress for multiple files
+        const interval = setInterval(() => {
+          setUploadProgress(prev => Math.min(prev + 10, 90));
+        }, 200);
+        
+        await uploadMultiple.mutateAsync({ files: selectedFiles, folder: uploadFolder });
+        
+        clearInterval(interval);
+        setUploadProgress(100);
+      }
+      
       toast({
         title: "Upload concluído!",
-        description: "Arquivo enviado com sucesso",
+        description: `${selectedFiles.length} arquivo(s) enviado(s) com sucesso`,
       });
       setUploadDialogOpen(false);
-      setSelectedFile(null);
-      setUploadFolder('Todos');
+      setSelectedFiles([]);
+      setUploadFolder('Banners');
+      setUploadProgress(0);
     } catch (error) {
       toast({
         title: "Erro no upload",
-        description: "Não foi possível enviar o arquivo",
+        description: "Não foi possível enviar os arquivos",
         variant: "destructive",
       });
+      setUploadProgress(0);
     }
   };
 
@@ -222,14 +298,66 @@ export default function MediaLibrary({ selectionMode = false, onSelect, onClose 
     }
   };
 
+  const handleOpenRename = (file: MediaFile) => {
+    setRenamingFile(file);
+    setNewFileName(file.name);
+    setRenameDialogOpen(true);
+  };
+
+  const handleRename = async () => {
+    if (!renamingFile || !newFileName.trim()) return;
+    
+    try {
+      await renameMedia.mutateAsync({ id: renamingFile.id, newName: newFileName.trim() });
+      toast({
+        title: "Arquivo renomeado",
+        description: "Nome atualizado com sucesso",
+      });
+      setRenameDialogOpen(false);
+      setRenamingFile(null);
+      setNewFileName('');
+    } catch (error) {
+      toast({
+        title: "Erro ao renomear",
+        description: "Não foi possível renomear o arquivo",
+        variant: "destructive",
+      });
+    }
+  };
+
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const isUploading = uploadMedia.isPending || uploadMultiple.isPending;
+
   const content = (
-    <div className={cn("p-4 md:p-6 lg:p-8", selectionMode && "p-0")}>
+    <div 
+      className={cn("p-4 md:p-6 lg:p-8 min-h-full", selectionMode && "p-0")}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDragging && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center">
+          <div className="border-2 border-dashed border-primary rounded-2xl p-12 bg-card/50">
+            <div className="text-center">
+              <FileUp className="w-16 h-16 mx-auto text-primary mb-4" />
+              <h3 className="text-xl font-semibold text-foreground mb-2">
+                Solte os arquivos aqui
+              </h3>
+              <p className="text-muted-foreground">
+                Imagens e vídeos serão enviados automaticamente
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
@@ -245,6 +373,7 @@ export default function MediaLibrary({ selectionMode = false, onSelect, onClose 
             ref={fileInputRef}
             type="file"
             accept="image/*,video/*"
+            multiple
             className="hidden"
             onChange={handleFileChange}
           />
@@ -354,6 +483,7 @@ export default function MediaLibrary({ selectionMode = false, onSelect, onClose 
                   onVideoPreview={handleVideoPreview}
                   onEditImage={handleEditImage}
                   onUpdateTags={handleUpdateTags}
+                  onRename={handleOpenRename}
                 />
               ))}
             </div>
@@ -376,13 +506,19 @@ export default function MediaLibrary({ selectionMode = false, onSelect, onClose 
                   onVideoPreview={handleVideoPreview}
                   onEditImage={handleEditImage}
                   onUpdateTags={handleUpdateTags}
+                  onRename={handleOpenRename}
                 />
               ))}
             </div>
           )}
 
           {!isLoading && filteredFiles.length === 0 && (
-            <div className="text-center py-16">
+            <div 
+              className={cn(
+                "text-center py-16 border-2 border-dashed rounded-2xl transition-colors",
+                isDragging ? "border-primary bg-primary/5" : "border-border"
+              )}
+            >
               <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted/50 flex items-center justify-center">
                 <ImageIcon className="w-10 h-10 text-muted-foreground" />
               </div>
@@ -390,7 +526,7 @@ export default function MediaLibrary({ selectionMode = false, onSelect, onClose 
                 Nenhum arquivo encontrado
               </h3>
               <p className="text-muted-foreground mb-4">
-                Tente buscar com outros termos ou faça upload de novos arquivos
+                Arraste arquivos aqui ou clique para fazer upload
               </p>
               <Button className="gap-2" onClick={() => fileInputRef.current?.click()}>
                 <Upload className="w-4 h-4" />
@@ -408,14 +544,39 @@ export default function MediaLibrary({ selectionMode = false, onSelect, onClose 
             <DialogTitle>Upload de Mídia</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {selectedFile && (
-              <div className="p-4 bg-muted/30 rounded-lg">
-                <p className="font-medium text-foreground">{selectedFile.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  {formatSize(selectedFile.size)}
-                </p>
+            {selectedFiles.length > 0 && (
+              <div className="max-h-48 overflow-y-auto space-y-2">
+                {selectedFiles.map((file, index) => (
+                  <div key={index} className="p-3 bg-muted/30 rounded-lg flex items-center gap-3">
+                    {file.type.startsWith('video/') ? (
+                      <Video className="w-8 h-8 text-muted-foreground" />
+                    ) : (
+                      <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground truncate">{file.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatSize(file.size)}
+                        {file.type.startsWith('image/') && file.type !== 'image/gif' && (
+                          <span className="text-primary ml-2">• Será comprimido</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
+            
+            {isUploading && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Enviando...</span>
+                  <span className="text-foreground">{uploadProgress}%</span>
+                </div>
+                <Progress value={uploadProgress} />
+              </div>
+            )}
+
             <div>
               <label className="text-sm font-medium text-foreground mb-2 block">
                 Pasta de destino
@@ -434,22 +595,57 @@ export default function MediaLibrary({ selectionMode = false, onSelect, onClose 
               </Select>
             </div>
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
+              <Button variant="outline" onClick={() => setUploadDialogOpen(false)} disabled={isUploading}>
                 Cancelar
               </Button>
               <Button 
                 onClick={handleUpload}
-                disabled={uploadMedia.isPending}
+                disabled={isUploading}
               >
-                {uploadMedia.isPending ? (
+                {isUploading ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : (
                   <Upload className="w-4 h-4 mr-2" />
                 )}
-                Enviar
+                Enviar {selectedFiles.length > 1 ? `(${selectedFiles.length})` : ''}
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Dialog */}
+      <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Renomear Arquivo</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-foreground mb-2 block">
+                Novo nome
+              </label>
+              <Input
+                value={newFileName}
+                onChange={(e) => setNewFileName(e.target.value)}
+                placeholder="Digite o novo nome..."
+                onKeyDown={(e) => e.key === 'Enter' && handleRename()}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleRename} disabled={!newFileName.trim() || renameMedia.isPending}>
+              {renameMedia.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Pencil className="w-4 h-4 mr-2" />
+              )}
+              Renomear
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -495,6 +691,7 @@ interface MediaCardProps {
   onVideoPreview: (file: MediaFile) => void;
   onEditImage: (file: MediaFile) => void;
   onUpdateTags: (file: MediaFile, tags: string[]) => void;
+  onRename: (file: MediaFile) => void;
 }
 
 function MediaCard({ 
@@ -508,7 +705,8 @@ function MediaCard({
   onUseInPost,
   onVideoPreview,
   onEditImage,
-  onUpdateTags
+  onUpdateTags,
+  onRename
 }: MediaCardProps) {
   return (
     <div 
@@ -611,6 +809,9 @@ function MediaCard({
                     <Play className="w-4 h-4" /> Reproduzir
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuItem className="gap-2" onClick={() => onRename(file)}>
+                  <Pencil className="w-4 h-4" /> Renomear
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="gap-2" onClick={() => onCopyUrl(file.url)}>
                   <Copy className="w-4 h-4" /> Copiar URL
@@ -644,6 +845,7 @@ interface MediaListItemProps {
   onVideoPreview: (file: MediaFile) => void;
   onEditImage: (file: MediaFile) => void;
   onUpdateTags: (file: MediaFile, tags: string[]) => void;
+  onRename: (file: MediaFile) => void;
 }
 
 function MediaListItem({ 
@@ -658,7 +860,8 @@ function MediaListItem({
   onUseInPost,
   onVideoPreview,
   onEditImage,
-  onUpdateTags
+  onUpdateTags,
+  onRename
 }: MediaListItemProps) {
   return (
     <div 
@@ -738,6 +941,9 @@ function MediaListItem({
                   <Play className="w-4 h-4" /> Reproduzir
                 </DropdownMenuItem>
               )}
+              <DropdownMenuItem className="gap-2" onClick={() => onRename(file)}>
+                <Pencil className="w-4 h-4" /> Renomear
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="gap-2" onClick={() => onCopyUrl(file.url)}>
                 <Copy className="w-4 h-4" /> Copiar URL
