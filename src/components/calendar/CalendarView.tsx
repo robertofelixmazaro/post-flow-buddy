@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { scheduledPosts, ScheduledPost, NetworkType } from '@/data/mockData';
 import { NetworkBadge } from '@/components/ui/NetworkBadge';
 import { cn } from '@/lib/utils';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const MONTHS = [
@@ -20,7 +20,13 @@ interface CalendarDay {
 }
 
 export function CalendarView() {
+  const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
+
+  const handleDayClick = (date: Date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    navigate(`/criar?date=${dateStr}`);
+  };
 
   const calendarDays = useMemo(() => {
     const year = currentDate.getFullYear();
@@ -102,13 +108,14 @@ export function CalendarView() {
       {/* Calendar grid */}
       <div className="grid grid-cols-7">
         {calendarDays.map((day, index) => (
-          <div
+          <button
             key={index}
+            onClick={() => handleDayClick(day.date)}
             className={cn(
-              "min-h-[120px] p-2 border-b border-r border-border",
+              "min-h-[120px] p-2 border-b border-r border-border text-left cursor-pointer",
               !day.isCurrentMonth && "bg-muted/30",
               day.isToday && "bg-primary/5",
-              "transition-colors hover:bg-accent/30"
+              "transition-colors hover:bg-primary/10 hover:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-inset"
             )}
           >
             <div className={cn(
@@ -123,7 +130,8 @@ export function CalendarView() {
               {day.posts.slice(0, 3).map(post => (
                 <div
                   key={post.id}
-                  className="group flex items-center gap-1 p-1 rounded text-xs bg-accent/50 hover:bg-accent cursor-pointer transition-colors"
+                  className="group flex items-center gap-1 p-1 rounded text-xs bg-accent/50 hover:bg-accent transition-colors"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <NetworkBadge network={post.network} size="sm" showLabel={false} className="!p-0.5" />
                   <span className="truncate text-foreground/80">{post.scheduledTime}</span>
@@ -135,7 +143,7 @@ export function CalendarView() {
                 </div>
               )}
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </div>

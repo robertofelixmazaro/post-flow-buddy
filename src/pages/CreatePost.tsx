@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { NetworkBadge } from '@/components/ui/NetworkBadge';
 import { NetworkType, getNetworkName } from '@/data/mockData';
 import { 
@@ -16,7 +18,8 @@ import {
   Twitter, 
   Linkedin,
   X,
-  Sparkles
+  Sparkles,
+  CalendarDays
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -28,13 +31,34 @@ const networks: { id: NetworkType; icon: typeof Instagram; maxLength: number }[]
   { id: 'linkedin', icon: Linkedin, maxLength: 3000 },
 ];
 
+const weekDays = [
+  { id: 0, label: 'Dom' },
+  { id: 1, label: 'Seg' },
+  { id: 2, label: 'Ter' },
+  { id: 3, label: 'Qua' },
+  { id: 4, label: 'Qui' },
+  { id: 5, label: 'Sex' },
+  { id: 6, label: 'Sáb' },
+];
+
 export default function CreatePost() {
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [content, setContent] = useState('');
   const [selectedNetworks, setSelectedNetworks] = useState<NetworkType[]>(['instagram']);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [repeatOnDays, setRepeatOnDays] = useState<number[]>([]);
+  const [enableRepeat, setEnableRepeat] = useState(false);
+
+  // Set date from URL parameter
+  useEffect(() => {
+    const dateParam = searchParams.get('date');
+    if (dateParam) {
+      setSelectedDate(dateParam);
+    }
+  }, [searchParams]);
 
   const toggleNetwork = (network: NetworkType) => {
     setSelectedNetworks(prev => 
@@ -74,9 +98,11 @@ export default function CreatePost() {
       return;
     }
 
+    const daysCount = enableRepeat && repeatOnDays.length > 0 ? repeatOnDays.length : 1;
+    
     toast({
       title: "Post agendado! 🎉",
-      description: `Agendado para ${selectedNetworks.length} rede(s) social(is)`,
+      description: `Agendado para ${selectedNetworks.length} rede(s) em ${daysCount} dia(s)`,
     });
   };
 
@@ -221,6 +247,68 @@ export default function CreatePost() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Repeat on multiple days */}
+            <div className="bg-card rounded-2xl border border-border p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <CalendarDays className="w-5 h-5 text-primary" />
+                <div className="flex items-center gap-2 flex-1">
+                  <Label className="text-sm font-medium text-foreground">
+                    Repetir em vários dias
+                  </Label>
+                  <Checkbox
+                    checked={enableRepeat}
+                    onCheckedChange={(checked) => {
+                      setEnableRepeat(checked === true);
+                      if (!checked) setRepeatOnDays([]);
+                    }}
+                  />
+                </div>
+              </div>
+              
+              {enableRepeat && (
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Selecione os dias da semana para publicar o mesmo post
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {weekDays.map(day => {
+                      const isSelected = repeatOnDays.includes(day.id);
+                      return (
+                        <button
+                          key={day.id}
+                          type="button"
+                          onClick={() => {
+                            setRepeatOnDays(prev => 
+                              isSelected 
+                                ? prev.filter(d => d !== day.id)
+                                : [...prev, day.id]
+                            );
+                          }}
+                          className={cn(
+                            "px-3 py-2 rounded-lg border text-sm font-medium transition-all duration-200",
+                            isSelected 
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border text-muted-foreground hover:border-primary/50"
+                          )}
+                        >
+                          {day.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => setRepeatOnDays([0, 1, 2, 3, 4, 5, 6])}
+                  >
+                    Selecionar todos
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Actions */}
