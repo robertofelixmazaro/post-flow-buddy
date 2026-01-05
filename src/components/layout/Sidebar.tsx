@@ -1,0 +1,103 @@
+import { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { 
+  Calendar, 
+  PenSquare, 
+  Image, 
+  BarChart3, 
+  Settings, 
+  Menu, 
+  X,
+  Zap
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+
+const navItems = [
+  { icon: Calendar, label: 'Calendário', path: '/' },
+  { icon: PenSquare, label: 'Criar Post', path: '/criar' },
+  { icon: Image, label: 'Biblioteca', path: '/biblioteca' },
+  { icon: BarChart3, label: 'Analytics', path: '/analytics' },
+  { icon: Settings, label: 'Configurações', path: '/configuracoes' },
+];
+
+export function Sidebar() {
+  const location = useLocation();
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <>
+      {/* Mobile menu button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="fixed top-4 left-4 z-50 md:hidden"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+      </Button>
+
+      {/* Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={cn(
+        "fixed left-0 top-0 h-full w-64 bg-sidebar border-r border-sidebar-border z-50",
+        "transform transition-transform duration-300 ease-in-out",
+        "md:translate-x-0",
+        isOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
+        <div className="flex flex-col h-full p-4">
+          {/* Logo */}
+          <div className="flex items-center gap-2 px-2 py-4 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+              <Zap className="w-6 h-6 text-primary-foreground" />
+            </div>
+            <span className="text-xl font-bold text-foreground">Agendasaas</span>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 space-y-1">
+            {navItems.map((item) => {
+              const isActive = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                    "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                    isActive && "bg-primary/10 text-primary border-l-2 border-primary"
+                  )}
+                >
+                  <item.icon className={cn(
+                    "w-5 h-5",
+                    isActive && "text-primary"
+                  )} />
+                  <span className="font-medium">{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* Stats footer */}
+          <div className="border-t border-sidebar-border pt-4 mt-4">
+            <div className="bg-sidebar-accent rounded-xl p-4">
+              <div className="text-sm text-muted-foreground mb-2">Posts agendados</div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-primary">12</span>
+                <span className="text-xs text-muted-foreground">esta semana</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </>
+  );
+}
