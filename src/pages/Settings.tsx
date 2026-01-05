@@ -1,10 +1,13 @@
+import { useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { connectedNetworks, bestTimes, getNetworkName } from '@/data/mockData';
+import { bestTimes, getNetworkName } from '@/data/mockData';
 import { NetworkBadge } from '@/components/ui/NetworkBadge';
+import { useNetworks } from '@/hooks/useNetworks';
+import { useToast } from '@/hooks/use-toast';
 import { 
   User, 
   Bell, 
@@ -13,11 +16,16 @@ import {
   Shield, 
   Palette,
   Check,
-  X,
   ExternalLink
 } from 'lucide-react';
-import { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const settingsSections = [
   { id: 'profile', label: 'Perfil', icon: User },
@@ -30,6 +38,7 @@ const settingsSections = [
 
 export default function Settings() {
   const { toast } = useToast();
+  const { networks, connectNetwork, disconnectNetwork } = useNetworks();
   const [activeSection, setActiveSection] = useState('profile');
   const [notifications, setNotifications] = useState({
     postPublished: true,
@@ -37,12 +46,41 @@ export default function Settings() {
     weeklyReport: true,
     tips: false,
   });
+  const [connectDialogOpen, setConnectDialogOpen] = useState(false);
+  const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
+  const [username, setUsername] = useState('');
 
   const handleSave = () => {
     toast({
       title: "Configurações salvas!",
       description: "Suas preferências foram atualizadas com sucesso.",
     });
+  };
+
+  const handleConnect = () => {
+    if (selectedNetwork && username.trim()) {
+      connectNetwork(selectedNetwork, username.trim());
+      toast({
+        title: "Rede conectada!",
+        description: `${getNetworkName(networks.find(n => n.id === selectedNetwork)?.network || 'instagram')} conectado com sucesso.`,
+      });
+      setConnectDialogOpen(false);
+      setUsername('');
+      setSelectedNetwork(null);
+    }
+  };
+
+  const handleDisconnect = (networkId: string, networkName: string) => {
+    disconnectNetwork(networkId);
+    toast({
+      title: "Rede desconectada",
+      description: `${networkName} foi desconectado.`,
+    });
+  };
+
+  const openConnectDialog = (networkId: string) => {
+    setSelectedNetwork(networkId);
+    setConnectDialogOpen(true);
   };
 
   return (
@@ -117,7 +155,7 @@ export default function Settings() {
                   Conecte suas redes sociais para começar a agendar posts
                 </p>
                 <div className="space-y-4">
-                  {connectedNetworks.map(network => (
+                  {networks.map(network => (
                     <div 
                       key={network.id}
                       className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border"
@@ -128,7 +166,7 @@ export default function Settings() {
                           <div className="font-medium text-foreground">{getNetworkName(network.network)}</div>
                           {network.connected && network.username && (
                             <div className="text-sm text-muted-foreground">
-                              {network.username} • {network.followers.toLocaleString()} seguidores
+                              @{network.username} • {network.followers.toLocaleString()} seguidores
                             </div>
                           )}
                           {!network.connected && (
@@ -145,10 +183,20 @@ export default function Settings() {
                               <Check className="w-4 h-4" />
                               Conectado
                             </span>
-                            <Button variant="outline" size="sm">Desconectar</Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleDisconnect(network.id, getNetworkName(network.network))}
+                            >
+                              Desconectar
+                            </Button>
                           </>
                         ) : (
-                          <Button size="sm" className="gap-2">
+                          <Button 
+                            size="sm" 
+                            className="gap-2"
+                            onClick={() => openConnectDialog(network.id)}
+                          >
                             <ExternalLink className="w-4 h-4" />
                             Conectar
                           </Button>
@@ -282,6 +330,35 @@ export default function Settings() {
           </div>
         </div>
       </div>
+
+      {/* Connect Dialog */}
+      <Dialog open={connectDialogOpen} onOpenChange={setConnectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Conectar Rede Social</DialogTitle>
+            <DialogDescription>
+              Digite seu nome de usuário para conectar sua conta
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label className="text-sm text-foreground mb-1.5 block">Nome de usuário</Label>
+            <Input
+              placeholder="@seu_usuario"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="bg-muted/30 border-border"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConnectDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConnect} disabled={!username.trim()}>
+              Conectar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
