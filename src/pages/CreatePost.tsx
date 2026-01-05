@@ -10,6 +10,7 @@ import { NetworkBadge } from '@/components/ui/NetworkBadge';
 import { NetworkType, getNetworkName } from '@/data/mockData';
 import { useCreatePost } from '@/hooks/useScheduledPosts';
 import { useSocialConnections } from '@/hooks/useSocialConnections';
+import MediaLibrary from './MediaLibrary';
 import { 
   Image, 
   Calendar, 
@@ -23,10 +24,15 @@ import {
   Sparkles,
   CalendarDays,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  FolderOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+} from '@/components/ui/dialog';
 
 const networks: { id: NetworkType; icon: typeof Instagram; maxLength: number }[] = [
   { id: 'instagram', icon: Instagram, maxLength: 2200 },
@@ -59,17 +65,27 @@ export default function CreatePost() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [repeatOnDays, setRepeatOnDays] = useState<number[]>([]);
   const [enableRepeat, setEnableRepeat] = useState(false);
+  const [mediaLibraryOpen, setMediaLibraryOpen] = useState(false);
 
   // Get connected networks
   const connectedNetworks = connections?.map(c => c.network) || [];
 
-  // Set date from URL parameter
+  // Set date and media from URL parameters
   useEffect(() => {
     const dateParam = searchParams.get('date');
+    const mediaParam = searchParams.get('media');
     if (dateParam) {
       setSelectedDate(dateParam);
     }
+    if (mediaParam) {
+      setImagePreview(decodeURIComponent(mediaParam));
+    }
   }, [searchParams]);
+
+  const handleMediaSelect = (url: string) => {
+    setImagePreview(url);
+    setMediaLibraryOpen(false);
+  };
 
   const toggleNetwork = (network: NetworkType) => {
     setSelectedNetworks(prev => 
@@ -238,6 +254,15 @@ export default function CreatePost() {
                     <span className="text-sm">Imagem</span>
                   </div>
                 </label>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="gap-2 text-muted-foreground"
+                  onClick={() => setMediaLibraryOpen(true)}
+                >
+                  <FolderOpen className="w-4 h-4" />
+                  Biblioteca
+                </Button>
                 <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
                   <Sparkles className="w-4 h-4" />
                   IA Sugestões
@@ -428,6 +453,17 @@ export default function CreatePost() {
             </div>
           </div>
         </div>
+
+        {/* Media Library Dialog */}
+        <Dialog open={mediaLibraryOpen} onOpenChange={setMediaLibraryOpen}>
+          <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
+            <MediaLibrary 
+              selectionMode 
+              onSelect={handleMediaSelect}
+              onClose={() => setMediaLibraryOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
