@@ -1,9 +1,13 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useMediaFiles, useUploadMedia, useDeleteMedia, MediaFile } from '@/hooks/useMediaFiles';
+import { Badge } from '@/components/ui/badge';
+import { useMediaFiles, useUploadMedia, useDeleteMedia, useUpdateMediaTags, useReplaceMediaFile, MediaFile } from '@/hooks/useMediaFiles';
+import { VideoPreviewDialog } from '@/components/media/VideoPreviewDialog';
+import { ImageEditorDialog } from '@/components/media/ImageEditorDialog';
+import { TagsManager, TagsFilter } from '@/components/media/TagsManager';
 import { 
   Search, 
   Upload, 
@@ -18,13 +22,17 @@ import {
   Copy,
   Loader2,
   Check,
-  Plus
+  Plus,
+  Play,
+  Edit,
+  Tag
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -58,18 +66,39 @@ export default function MediaLibrary({ selectionMode = false, onSelect, onClose 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedFolder, setSelectedFolder] = useState('Todos');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadFolder, setUploadFolder] = useState('Todos');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  
+  // Video preview state
+  const [videoPreviewOpen, setVideoPreviewOpen] = useState(false);
+  const [previewVideo, setPreviewVideo] = useState<MediaFile | null>(null);
+  
+  // Image editor state
+  const [imageEditorOpen, setImageEditorOpen] = useState(false);
+  const [editingImage, setEditingImage] = useState<MediaFile | null>(null);
 
   const { data: mediaFiles = [], isLoading } = useMediaFiles();
   const uploadMedia = useUploadMedia();
   const deleteMedia = useDeleteMedia();
+  const updateTags = useUpdateMediaTags();
+  const replaceMedia = useReplaceMediaFile();
+
+  // Get all unique tags from media files
+  const allTags = useMemo(() => {
+    const tagsSet = new Set<string>();
+    mediaFiles.forEach(file => {
+      file.tags?.forEach(tag => tagsSet.add(tag));
+    });
+    return Array.from(tagsSet).sort();
+  }, [mediaFiles]);
 
   const filteredFiles = mediaFiles.filter(file => {
     const matchesFolder = selectedFolder === 'Todos' || file.folder === selectedFolder;
     const matchesSearch = file.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesFolder && matchesSearch;
+    const matchesTags = selectedTags.length === 0 || selectedTags.every(tag => file.tags?.includes(tag));
+    return matchesFolder && matchesSearch && matchesTags;
   });
 
   const imageCount = mediaFiles.filter(f => f.type === 'image').length;
@@ -149,6 +178,50 @@ export default function MediaLibrary({ selectionMode = false, onSelect, onClose 
     navigate(`/criar-post?media=${encodeURIComponent(file.url)}`);
   };
 
+  const handleVideoPreview = (file: MediaFile) => {
+    setPreviewVideo(file);
+    setVideoPreviewOpen(true);
+  };
+
+  const handleEditImage = (file: MediaFile) => {
+    setEditingImage(file);
+    setImageEditorOpen(true);
+  };
+
+  const handleSaveEditedImage = async (blob: Blob) => {
+    if (!editingImage) return;
+    
+    try {
+      await replaceMedia.mutateAsync({
+        id: editingImage.id,
+        file: blob,
+        oldFilePath: editingImage.file_path,
+      });
+      toast({
+        title: "Imagem atualizada!",
+        description: "As alterações foram salvas com sucesso",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro ao salvar",
+        description: "Não foi possível salvar as alterações",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUpdateTags = async (file: MediaFile, newTags: string[]) => {
+    try {
+      await updateTags.mutateAsync({ id: file.id, tags: newTags });
+    } catch (error) {
+      toast({
+        title: "Erro ao atualizar tags",
+        description: "Não foi possível atualizar as tags",
+        variant: "destructive",
+      });
+    }
+  };
+
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -184,27 +257,44 @@ export default function MediaLibrary({ selectionMode = false, onSelect, onClose 
 
       <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-6">
         {/* Sidebar */}
-        <div className="bg-card rounded-2xl border border-border p-4 h-fit">
-          <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-            <FolderOpen className="w-4 h-4" />
-            Pastas
-          </h3>
-          <div className="space-y-1">
-            {folders.map(folder => (
-              <button
-                key={folder}
-                onClick={() => setSelectedFolder(folder)}
-                className={cn(
-                  "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors",
-                  selectedFolder === folder
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                )}
-              >
-                {folder}
-              </button>
-            ))}
+        <div className="space-y-4">
+          <div className="bg-card rounded-2xl border border-border p-4 h-fit">
+            <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+              <FolderOpen className="w-4 h-4" />
+              Pastas
+            </h3>
+            <div className="space-y-1">
+              {folders.map(folder => (
+                <button
+                  key={folder}
+                  onClick={() => setSelectedFolder(folder)}
+                  className={cn(
+                    "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors",
+                    selectedFolder === folder
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  )}
+                >
+                  {folder}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* Tags Filter */}
+          {allTags.length > 0 && (
+            <div className="bg-card rounded-2xl border border-border p-4 h-fit">
+              <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                <Tag className="w-4 h-4" />
+                Tags
+              </h3>
+              <TagsFilter 
+                allTags={allTags} 
+                selectedTags={selectedTags} 
+                onSelectedTagsChange={setSelectedTags} 
+              />
+            </div>
+          )}
         </div>
 
         {/* Main content */}
@@ -255,11 +345,15 @@ export default function MediaLibrary({ selectionMode = false, onSelect, onClose 
                   key={file.id} 
                   file={file} 
                   formatSize={formatSize}
+                  allTags={allTags}
                   onCopyUrl={handleCopyUrl}
                   onDownload={handleDownload}
                   onDelete={handleDelete}
                   onSelect={selectionMode ? handleSelectMedia : undefined}
                   onUseInPost={!selectionMode ? handleUseInPost : undefined}
+                  onVideoPreview={handleVideoPreview}
+                  onEditImage={handleEditImage}
+                  onUpdateTags={handleUpdateTags}
                 />
               ))}
             </div>
@@ -273,11 +367,15 @@ export default function MediaLibrary({ selectionMode = false, onSelect, onClose 
                   file={file} 
                   isLast={index === filteredFiles.length - 1}
                   formatSize={formatSize}
+                  allTags={allTags}
                   onCopyUrl={handleCopyUrl}
                   onDownload={handleDownload}
                   onDelete={handleDelete}
                   onSelect={selectionMode ? handleSelectMedia : undefined}
                   onUseInPost={!selectionMode ? handleUseInPost : undefined}
+                  onVideoPreview={handleVideoPreview}
+                  onEditImage={handleEditImage}
+                  onUpdateTags={handleUpdateTags}
                 />
               ))}
             </div>
@@ -354,6 +452,27 @@ export default function MediaLibrary({ selectionMode = false, onSelect, onClose 
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Video Preview Dialog */}
+      {previewVideo && (
+        <VideoPreviewDialog
+          open={videoPreviewOpen}
+          onOpenChange={setVideoPreviewOpen}
+          videoUrl={previewVideo.url}
+          videoName={previewVideo.name}
+        />
+      )}
+
+      {/* Image Editor Dialog */}
+      {editingImage && (
+        <ImageEditorDialog
+          open={imageEditorOpen}
+          onOpenChange={setImageEditorOpen}
+          imageUrl={editingImage.url}
+          imageName={editingImage.name}
+          onSave={handleSaveEditedImage}
+        />
+      )}
     </div>
   );
 
@@ -367,14 +486,30 @@ export default function MediaLibrary({ selectionMode = false, onSelect, onClose 
 interface MediaCardProps {
   file: MediaFile;
   formatSize: (bytes: number) => string;
+  allTags: string[];
   onCopyUrl: (url: string) => void;
   onDownload: (url: string, name: string) => void;
   onDelete: (file: MediaFile) => void;
   onSelect?: (file: MediaFile) => void;
   onUseInPost?: (file: MediaFile) => void;
+  onVideoPreview: (file: MediaFile) => void;
+  onEditImage: (file: MediaFile) => void;
+  onUpdateTags: (file: MediaFile, tags: string[]) => void;
 }
 
-function MediaCard({ file, formatSize, onCopyUrl, onDownload, onDelete, onSelect, onUseInPost }: MediaCardProps) {
+function MediaCard({ 
+  file, 
+  formatSize, 
+  allTags,
+  onCopyUrl, 
+  onDownload, 
+  onDelete, 
+  onSelect, 
+  onUseInPost,
+  onVideoPreview,
+  onEditImage,
+  onUpdateTags
+}: MediaCardProps) {
   return (
     <div 
       className={cn(
@@ -385,11 +520,21 @@ function MediaCard({ file, formatSize, onCopyUrl, onDownload, onDelete, onSelect
     >
       <div className="aspect-square relative">
         {file.type === 'video' ? (
-          <video 
-            src={file.url} 
-            className="w-full h-full object-cover"
-            muted
-          />
+          <>
+            <video 
+              src={file.url} 
+              className="w-full h-full object-cover"
+              muted
+            />
+            <button
+              className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={(e) => { e.stopPropagation(); onVideoPreview(file); }}
+            >
+              <div className="w-12 h-12 rounded-full bg-background/80 flex items-center justify-center">
+                <Play className="w-6 h-6 text-foreground ml-0.5" />
+              </div>
+            </button>
+          </>
         ) : (
           <img 
             src={file.url} 
@@ -403,6 +548,22 @@ function MediaCard({ file, formatSize, onCopyUrl, onDownload, onDelete, onSelect
           <div className="absolute top-2 left-2 px-2 py-1 rounded-md bg-background/80 text-xs font-medium text-foreground flex items-center gap-1">
             <Video className="w-3 h-3" />
             Vídeo
+          </div>
+        )}
+
+        {/* Tags display */}
+        {file.tags && file.tags.length > 0 && (
+          <div className="absolute bottom-12 left-2 right-2 flex flex-wrap gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {file.tags.slice(0, 3).map(tag => (
+              <Badge key={tag} variant="secondary" className="text-xs">
+                {tag}
+              </Badge>
+            ))}
+            {file.tags.length > 3 && (
+              <Badge variant="secondary" className="text-xs">
+                +{file.tags.length - 3}
+              </Badge>
+            )}
           </div>
         )}
 
@@ -421,33 +582,49 @@ function MediaCard({ file, formatSize, onCopyUrl, onDownload, onDelete, onSelect
             <Check className="w-4 h-4" />
           </Button>
         ) : (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <Button 
-                variant="secondary" 
-                size="icon" 
-                className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <MoreVertical className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {onUseInPost && (
-                <DropdownMenuItem className="gap-2" onClick={() => onUseInPost(file)}>
-                  <Plus className="w-4 h-4" /> Usar em post
+          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <TagsManager
+              tags={file.tags || []}
+              onTagsChange={(tags) => onUpdateTags(file, tags)}
+              availableTags={allTags}
+              compact
+            />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                <Button variant="secondary" size="icon" className="h-8 w-8">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {onUseInPost && (
+                  <DropdownMenuItem className="gap-2" onClick={() => onUseInPost(file)}>
+                    <Plus className="w-4 h-4" /> Usar em post
+                  </DropdownMenuItem>
+                )}
+                {file.type === 'image' && (
+                  <DropdownMenuItem className="gap-2" onClick={() => onEditImage(file)}>
+                    <Edit className="w-4 h-4" /> Editar imagem
+                  </DropdownMenuItem>
+                )}
+                {file.type === 'video' && (
+                  <DropdownMenuItem className="gap-2" onClick={() => onVideoPreview(file)}>
+                    <Play className="w-4 h-4" /> Reproduzir
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="gap-2" onClick={() => onCopyUrl(file.url)}>
+                  <Copy className="w-4 h-4" /> Copiar URL
                 </DropdownMenuItem>
-              )}
-              <DropdownMenuItem className="gap-2" onClick={() => onCopyUrl(file.url)}>
-                <Copy className="w-4 h-4" /> Copiar URL
-              </DropdownMenuItem>
-              <DropdownMenuItem className="gap-2" onClick={() => onDownload(file.url, file.name)}>
-                <Download className="w-4 h-4" /> Download
-              </DropdownMenuItem>
-              <DropdownMenuItem className="gap-2 text-destructive" onClick={() => onDelete(file)}>
-                <Trash2 className="w-4 h-4" /> Excluir
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <DropdownMenuItem className="gap-2" onClick={() => onDownload(file.url, file.name)}>
+                  <Download className="w-4 h-4" /> Download
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="gap-2 text-destructive" onClick={() => onDelete(file)}>
+                  <Trash2 className="w-4 h-4" /> Excluir
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         )}
       </div>
     </div>
@@ -458,14 +635,31 @@ interface MediaListItemProps {
   file: MediaFile;
   isLast: boolean;
   formatSize: (bytes: number) => string;
+  allTags: string[];
   onCopyUrl: (url: string) => void;
   onDownload: (url: string, name: string) => void;
   onDelete: (file: MediaFile) => void;
   onSelect?: (file: MediaFile) => void;
   onUseInPost?: (file: MediaFile) => void;
+  onVideoPreview: (file: MediaFile) => void;
+  onEditImage: (file: MediaFile) => void;
+  onUpdateTags: (file: MediaFile, tags: string[]) => void;
 }
 
-function MediaListItem({ file, isLast, formatSize, onCopyUrl, onDownload, onDelete, onSelect, onUseInPost }: MediaListItemProps) {
+function MediaListItem({ 
+  file, 
+  isLast, 
+  formatSize, 
+  allTags,
+  onCopyUrl, 
+  onDownload, 
+  onDelete, 
+  onSelect, 
+  onUseInPost,
+  onVideoPreview,
+  onEditImage,
+  onUpdateTags
+}: MediaListItemProps) {
   return (
     <div 
       className={cn(
@@ -475,9 +669,17 @@ function MediaListItem({ file, isLast, formatSize, onCopyUrl, onDownload, onDele
       )}
       onClick={() => onSelect?.(file)}
     >
-      <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
+      <div className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
         {file.type === 'video' ? (
-          <video src={file.url} className="w-full h-full object-cover" muted />
+          <>
+            <video src={file.url} className="w-full h-full object-cover" muted />
+            <button
+              className="absolute inset-0 flex items-center justify-center bg-black/30"
+              onClick={(e) => { e.stopPropagation(); onVideoPreview(file); }}
+            >
+              <Play className="w-6 h-6 text-white" />
+            </button>
+          </>
         ) : (
           <img src={file.url} alt={file.name} className="w-full h-full object-cover" />
         )}
@@ -487,6 +689,15 @@ function MediaListItem({ file, isLast, formatSize, onCopyUrl, onDownload, onDele
         <p className="text-sm text-muted-foreground">
           {file.folder} • {formatSize(file.size)}
         </p>
+        {file.tags && file.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {file.tags.map(tag => (
+              <Badge key={tag} variant="outline" className="text-xs">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
       {onSelect ? (
         <Button 
@@ -498,29 +709,49 @@ function MediaListItem({ file, isLast, formatSize, onCopyUrl, onDownload, onDele
           <Check className="w-4 h-4" />
         </Button>
       ) : (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreVertical className="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {onUseInPost && (
-              <DropdownMenuItem className="gap-2" onClick={() => onUseInPost(file)}>
-                <Plus className="w-4 h-4" /> Usar em post
+        <div className="flex items-center gap-1">
+          <TagsManager
+            tags={file.tags || []}
+            onTagsChange={(tags) => onUpdateTags(file, tags)}
+            availableTags={allTags}
+            compact
+          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {onUseInPost && (
+                <DropdownMenuItem className="gap-2" onClick={() => onUseInPost(file)}>
+                  <Plus className="w-4 h-4" /> Usar em post
+                </DropdownMenuItem>
+              )}
+              {file.type === 'image' && (
+                <DropdownMenuItem className="gap-2" onClick={() => onEditImage(file)}>
+                  <Edit className="w-4 h-4" /> Editar imagem
+                </DropdownMenuItem>
+              )}
+              {file.type === 'video' && (
+                <DropdownMenuItem className="gap-2" onClick={() => onVideoPreview(file)}>
+                  <Play className="w-4 h-4" /> Reproduzir
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="gap-2" onClick={() => onCopyUrl(file.url)}>
+                <Copy className="w-4 h-4" /> Copiar URL
               </DropdownMenuItem>
-            )}
-            <DropdownMenuItem className="gap-2" onClick={() => onCopyUrl(file.url)}>
-              <Copy className="w-4 h-4" /> Copiar URL
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2" onClick={() => onDownload(file.url, file.name)}>
-              <Download className="w-4 h-4" /> Download
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2 text-destructive" onClick={() => onDelete(file)}>
-              <Trash2 className="w-4 h-4" /> Excluir
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <DropdownMenuItem className="gap-2" onClick={() => onDownload(file.url, file.name)}>
+                <Download className="w-4 h-4" /> Download
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="gap-2 text-destructive" onClick={() => onDelete(file)}>
+                <Trash2 className="w-4 h-4" /> Excluir
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       )}
     </div>
   );
