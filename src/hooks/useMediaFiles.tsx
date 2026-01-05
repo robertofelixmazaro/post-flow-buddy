@@ -11,6 +11,7 @@ export interface MediaFile {
   size: number;
   type: string;
   folder: string;
+  tags: string[];
   created_at: string;
 }
 
@@ -28,7 +29,10 @@ export function useMediaFiles() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as MediaFile[];
+      return (data as any[]).map(file => ({
+        ...file,
+        tags: file.tags || []
+      })) as MediaFile[];
     },
     enabled: !!user,
   });
@@ -39,7 +43,7 @@ export function useUploadMedia() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ file, folder }: { file: File; folder: string }) => {
+    mutationFn: async ({ file, folder, tags = [] }: { file: File; folder: string; tags?: string[] }) => {
       if (!user) throw new Error('User not authenticated');
 
       const fileExt = file.name.split('.').pop();
@@ -69,7 +73,77 @@ export function useUploadMedia() {
           size: file.size,
           type: file.type.startsWith('video/') ? 'video' : 'image',
           folder: folder,
+          tags: tags,
         })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['media-files'] });
+    },
+  });
+}
+
+export function useUpdateMediaTags() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, tags }: { id: string; tags: string[] }) => {
+      const { data, error } = await supabase
+        .from('media_files')
+        .update({ tags })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['media-files'] });
+    },
+  });
+}
+
+export function useReplaceMediaFile() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, file, oldFilePath }: { id: string; file: Blob; oldFilePath: string }) => {
+      if (!user) throw new Error('User not authenticated');
+
+      // Delete old file
+      await supabase.storage.from('media').remove([oldFilePath]);
+
+      // Upload new file
+      const fileExt = oldFilePath.split('.').pop() || 'jpg';
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('media')
+        .getPublicUrl(filePath);
+
+      // Update metadata
+      const { data, error } = await supabase
+        .from('media_files')
+        .update({
+          file_path: filePath,
+          url: urlData.publicUrl,
+          size: file.size,
+        })
+        .eq('id', id)
         .select()
         .single();
 
