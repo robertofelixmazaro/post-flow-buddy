@@ -14,7 +14,164 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      post_logs: {
+        Row: {
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          external_post_id: string | null
+          id: string
+          network: Database["public"]["Enums"]["network_type"]
+          post_id: string
+          published_at: string | null
+          status: Database["public"]["Enums"]["post_status"]
+        }
+        Insert: {
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          external_post_id?: string | null
+          id?: string
+          network: Database["public"]["Enums"]["network_type"]
+          post_id: string
+          published_at?: string | null
+          status: Database["public"]["Enums"]["post_status"]
+        }
+        Update: {
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          external_post_id?: string | null
+          id?: string
+          network?: Database["public"]["Enums"]["network_type"]
+          post_id?: string
+          published_at?: string | null
+          status?: Database["public"]["Enums"]["post_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_logs_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      scheduled_posts: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          media_urls: string[] | null
+          networks: Database["public"]["Enums"]["network_type"][]
+          scheduled_at: string
+          status: Database["public"]["Enums"]["post_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          media_urls?: string[] | null
+          networks: Database["public"]["Enums"]["network_type"][]
+          scheduled_at: string
+          status?: Database["public"]["Enums"]["post_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          media_urls?: string[] | null
+          networks?: Database["public"]["Enums"]["network_type"][]
+          scheduled_at?: string
+          status?: Database["public"]["Enums"]["post_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      social_connections: {
+        Row: {
+          access_token_encrypted: string
+          account_id: string
+          account_name: string | null
+          account_username: string | null
+          connected_at: string
+          id: string
+          network: Database["public"]["Enums"]["network_type"]
+          page_id: string | null
+          page_name: string | null
+          permissions: string[] | null
+          refresh_token_encrypted: string | null
+          token_expires_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token_encrypted: string
+          account_id: string
+          account_name?: string | null
+          account_username?: string | null
+          connected_at?: string
+          id?: string
+          network: Database["public"]["Enums"]["network_type"]
+          page_id?: string | null
+          page_name?: string | null
+          permissions?: string[] | null
+          refresh_token_encrypted?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token_encrypted?: string
+          account_id?: string
+          account_name?: string | null
+          account_username?: string | null
+          connected_at?: string
+          id?: string
+          network?: Database["public"]["Enums"]["network_type"]
+          page_id?: string | null
+          page_name?: string | null
+          permissions?: string[] | null
+          refresh_token_encrypted?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +180,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      network_type: "instagram" | "facebook" | "twitter" | "linkedin"
+      post_status: "scheduled" | "published" | "failed" | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +308,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      network_type: ["instagram", "facebook", "twitter", "linkedin"],
+      post_status: ["scheduled", "published", "failed", "cancelled"],
+    },
   },
 } as const

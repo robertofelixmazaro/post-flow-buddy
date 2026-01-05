@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { NetworkBadge } from '@/components/ui/NetworkBadge';
 import { NetworkType, getNetworkName } from '@/data/mockData';
+import { useCreatePost } from '@/hooks/useScheduledPosts';
+import { useSocialConnections } from '@/hooks/useSocialConnections';
 import { 
   Image, 
   Calendar, 
@@ -19,7 +21,9 @@ import {
   Linkedin,
   X,
   Sparkles,
-  CalendarDays
+  CalendarDays,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -43,14 +47,21 @@ const weekDays = [
 
 export default function CreatePost() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const createPost = useCreatePost();
+  const { data: connections } = useSocialConnections();
+  
   const [content, setContent] = useState('');
-  const [selectedNetworks, setSelectedNetworks] = useState<NetworkType[]>(['instagram']);
+  const [selectedNetworks, setSelectedNetworks] = useState<NetworkType[]>([]);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [repeatOnDays, setRepeatOnDays] = useState<number[]>([]);
   const [enableRepeat, setEnableRepeat] = useState(false);
+
+  // Get connected networks
+  const connectedNetworks = connections?.map(c => c.network) || [];
 
   // Set date from URL parameter
   useEffect(() => {
@@ -79,7 +90,7 @@ export default function CreatePost() {
     }
   };
 
-  const handleSchedule = () => {
+  const handleSchedule = async () => {
     if (!content.trim()) {
       toast({
         title: "Conteúdo obrigatório",
@@ -92,18 +103,44 @@ export default function CreatePost() {
     if (selectedNetworks.length === 0) {
       toast({
         title: "Selecione uma rede",
-        description: "Escolha pelo menos uma rede social",
+        description: "Escolha pelo menos uma rede social conectada",
         variant: "destructive",
       });
       return;
     }
 
-    const daysCount = enableRepeat && repeatOnDays.length > 0 ? repeatOnDays.length : 1;
-    
-    toast({
-      title: "Post agendado! 🎉",
-      description: `Agendado para ${selectedNetworks.length} rede(s) em ${daysCount} dia(s)`,
-    });
+    if (!selectedDate || !selectedTime) {
+      toast({
+        title: "Data e hora obrigatórios",
+        description: "Selecione quando deseja publicar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const scheduledAt = new Date(`${selectedDate}T${selectedTime}`).toISOString();
+      
+      await createPost.mutateAsync({
+        content,
+        networks: selectedNetworks,
+        scheduled_at: scheduledAt,
+        media_urls: imagePreview ? [imagePreview] : undefined
+      });
+
+      toast({
+        title: "Post agendado! 🎉",
+        description: `Agendado para ${selectedNetworks.length} rede(s)`,
+      });
+
+      navigate('/agendamentos');
+    } catch (error) {
+      toast({
+        title: "Erro ao agendar",
+        description: "Tente novamente mais tarde",
+        variant: "destructive",
+      });
+    }
   };
 
   const minCharLimit = Math.min(...selectedNetworks.map(n => 
@@ -131,26 +168,42 @@ export default function CreatePost() {
               <Label className="text-sm font-medium text-foreground mb-3 block">
                 Redes Sociais
               </Label>
-              <div className="flex flex-wrap gap-2">
-                {networks.map(network => {
-                  const isSelected = selectedNetworks.includes(network.id);
-                  return (
-                    <button
-                      key={network.id}
-                      onClick={() => toggleNetwork(network.id)}
-                      className={cn(
-                        "flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-200",
-                        isSelected 
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-muted-foreground hover:border-primary/50"
-                      )}
-                    >
-                      <network.icon className="w-4 h-4" />
-                      <span className="text-sm font-medium">{getNetworkName(network.id)}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              {connectedNetworks.length === 0 ? (
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/30 border border-border">
+                  <AlertCircle className="w-5 h-5 text-yellow-500" />
+                  <div>
+                    <p className="text-sm text-foreground">Nenhuma rede conectada</p>
+                    <p className="text-xs text-muted-foreground">
+                      Conecte suas redes sociais nas <button onClick={() => navigate('/configuracoes')} className="text-primary hover:underline">configurações</button>
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {networks.map(network => {
+                    const isConnected = connectedNetworks.includes(network.id);
+                    const isSelected = selectedNetworks.includes(network.id);
+                    
+                    if (!isConnected) return null;
+                    
+                    return (
+                      <button
+                        key={network.id}
+                        onClick={() => toggleNetwork(network.id)}
+                        className={cn(
+                          "flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-200",
+                          isSelected 
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border text-muted-foreground hover:border-primary/50"
+                        )}
+                      >
+                        <network.icon className="w-4 h-4" />
+                        <span className="text-sm font-medium">{getNetworkName(network.id)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Content editor */}
@@ -317,9 +370,14 @@ export default function CreatePost() {
                 onClick={handleSchedule}
                 className="flex-1 gap-2"
                 size="lg"
+                disabled={createPost.isPending}
               >
-                <Send className="w-4 h-4" />
-                Agendar Post
+                {createPost.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                {createPost.isPending ? 'Agendando...' : 'Agendar Post'}
               </Button>
               <Button variant="outline" size="lg">
                 Salvar Rascunho
