@@ -22,9 +22,8 @@ const NetworksContext = createContext<NetworksContextType | undefined>(undefined
 const initialNetworks: NetworkConnection[] = [
   { id: '1', network: 'instagram', username: '', followers: 0, connected: false, avatar: '' },
   { id: '2', network: 'facebook', username: '', followers: 0, connected: false, avatar: '' },
-  { id: '3', network: 'google', username: '', followers: 0, connected: false, avatar: '' },
-  { id: '4', network: 'tiktok', username: '', followers: 0, connected: false, avatar: '' },
-  { id: '5', network: 'youtube', username: '', followers: 0, connected: false, avatar: '' },
+  { id: '3', network: 'tiktok', username: '', followers: 0, connected: false, avatar: '' },
+  { id: '4', network: 'linkedin', username: '', followers: 0, connected: false, avatar: '' },
 ];
 
 export function NetworksProvider({ children }: { children: ReactNode }) {

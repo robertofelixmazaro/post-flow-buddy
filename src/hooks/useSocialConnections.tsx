@@ -65,17 +65,13 @@ export function getOAuthUrl(network: NetworkType): string {
       // Instagram uses Facebook OAuth with instagram permissions
       return `https://www.facebook.com/v18.0/dialog/oauth?client_id=YOUR_APP_ID&redirect_uri=${encodeURIComponent(redirectUri)}&scope=instagram_basic,instagram_content_publish,pages_show_list&state=${network}`;
     
-    case 'google':
-      // Google Business Profile OAuth
-      return `https://accounts.google.com/o/oauth2/v2/auth?client_id=YOUR_CLIENT_ID&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=https://www.googleapis.com/auth/business.manage&state=${network}`;
-    
     case 'tiktok':
       // TikTok OAuth
       return `https://www.tiktok.com/v2/auth/authorize?client_key=YOUR_CLIENT_KEY&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=user.info.basic,video.publish&state=${network}`;
     
-    case 'youtube':
-      // YouTube OAuth (via Google)
-      return `https://accounts.google.com/o/oauth2/v2/auth?client_id=YOUR_CLIENT_ID&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=https://www.googleapis.com/auth/youtube.upload&state=${network}`;
+    case 'linkedin':
+      // LinkedIn OAuth
+      return `https://www.linkedin.com/oauth/v2/authorization?client_id=YOUR_CLIENT_ID&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=w_member_social&state=${network}`;
     
     default:
       return '#';
