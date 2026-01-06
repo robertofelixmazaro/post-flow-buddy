@@ -9,12 +9,89 @@ import { Zap, Mail, Lock, User, Loader2, Phone, MapPin, Building2, Users, UserCi
 import { z } from 'zod';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
-const emailSchema = z.string().email('Email inválido');
+// Validation functions
+const validateCPF = (cpf: string): boolean => {
+  const numbers = cpf.replace(/\D/g, '');
+  
+  if (numbers.length !== 11) return false;
+  
+  // Check for known invalid CPFs (all same digits)
+  if (/^(\d)\1{10}$/.test(numbers)) return false;
+  
+  // Validate first check digit
+  let sum = 0;
+  for (let i = 0; i < 9; i++) {
+    sum += parseInt(numbers[i]) * (10 - i);
+  }
+  let remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(numbers[9])) return false;
+  
+  // Validate second check digit
+  sum = 0;
+  for (let i = 0; i < 10; i++) {
+    sum += parseInt(numbers[i]) * (11 - i);
+  }
+  remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(numbers[10])) return false;
+  
+  return true;
+};
+
+const validatePhone = (phone: string): boolean => {
+  const numbers = phone.replace(/\D/g, '');
+  
+  // Must have 10 or 11 digits
+  if (numbers.length < 10 || numbers.length > 11) return false;
+  
+  // DDD must be valid (11-99)
+  const ddd = parseInt(numbers.slice(0, 2));
+  if (ddd < 11 || ddd > 99) return false;
+  
+  // Mobile phones start with 9 and have 11 digits, landlines have 10 digits
+  if (numbers.length === 11 && numbers[2] !== '9') return false;
+  
+  return true;
+};
+
+const validateFullName = (name: string): boolean => {
+  const trimmed = name.trim();
+  // Must have at least first and last name
+  const parts = trimmed.split(/\s+/).filter(p => p.length > 0);
+  if (parts.length < 2) return false;
+  // Each part must have at least 2 characters
+  if (parts.some(p => p.length < 2)) return false;
+  // Must contain only letters, spaces and accents
+  if (!/^[a-zA-ZÀ-ÿ\s]+$/.test(trimmed)) return false;
+  return true;
+};
+
+const validateCity = (city: string): boolean => {
+  const trimmed = city.trim();
+  if (trimmed.length < 2) return false;
+  // Must contain only letters, spaces, accents and hyphens
+  if (!/^[a-zA-ZÀ-ÿ\s\-]+$/.test(trimmed)) return false;
+  return true;
+};
+
+// Zod schemas
+const emailSchema = z.string().min(1, 'Email é obrigatório').email('Email inválido');
 const passwordSchema = z.string().min(6, 'A senha deve ter pelo menos 6 caracteres');
-const cpfSchema = z.string().regex(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, 'CPF inválido (formato: XXX.XXX.XXX-XX)');
-const phoneSchema = z.string().regex(/^\(\d{2}\) \d{4,5}-\d{4}$/, 'Telefone inválido (formato: (XX) XXXXX-XXXX)');
-const nameSchema = z.string().min(3, 'Nome deve ter pelo menos 3 caracteres');
-const citySchema = z.string().min(2, 'Cidade deve ter pelo menos 2 caracteres');
+const cpfSchema = z.string()
+  .min(1, 'CPF é obrigatório')
+  .regex(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, 'CPF inválido (formato: XXX.XXX.XXX-XX)')
+  .refine(validateCPF, 'CPF inválido - dígitos verificadores incorretos');
+const phoneSchema = z.string()
+  .min(1, 'Telefone é obrigatório')
+  .regex(/^\(\d{2}\) \d{4,5}-\d{4}$/, 'Telefone inválido (formato: (XX) XXXXX-XXXX)')
+  .refine(validatePhone, 'Telefone inválido - DDD ou número incorreto');
+const nameSchema = z.string()
+  .min(1, 'Nome é obrigatório')
+  .refine(validateFullName, 'Informe nome e sobrenome (apenas letras)');
+const citySchema = z.string()
+  .min(1, 'Cidade é obrigatória')
+  .refine(validateCity, 'Cidade inválida (apenas letras)');
 
 type UsageType = 'personal' | 'business' | 'multiple_businesses';
 
