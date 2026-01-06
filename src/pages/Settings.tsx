@@ -48,8 +48,9 @@ const settingsSections = [
 const availableNetworks = [
   { id: 'instagram', name: 'Instagram', description: 'Conta Business ou Creator vinculada a Página do Facebook' },
   { id: 'facebook', name: 'Facebook', description: 'Publicação em Páginas do Facebook' },
-  { id: 'twitter', name: 'Twitter/X', description: 'Publicação de tweets via API v2' },
-  { id: 'linkedin', name: 'LinkedIn', description: 'Publicação no perfil profissional' },
+  { id: 'google', name: 'Google', description: 'Perfil de empresa no Google Meu Negócio' },
+  { id: 'tiktok', name: 'TikTok', description: 'Publicação de vídeos no TikTok' },
+  { id: 'youtube', name: 'YouTube', description: 'Publicação de vídeos no YouTube' },
 ] as const;
 
 export default function Settings() {
