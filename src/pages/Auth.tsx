@@ -1,15 +1,48 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth, SignUpData } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Zap, Mail, Lock, User, Loader2 } from 'lucide-react';
+import { Zap, Mail, Lock, User, Loader2, Phone, MapPin, Building2, Users, UserCircle } from 'lucide-react';
 import { z } from 'zod';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const emailSchema = z.string().email('Email inválido');
 const passwordSchema = z.string().min(6, 'A senha deve ter pelo menos 6 caracteres');
+const cpfSchema = z.string().regex(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, 'CPF inválido (formato: XXX.XXX.XXX-XX)');
+const phoneSchema = z.string().regex(/^\(\d{2}\) \d{4,5}-\d{4}$/, 'Telefone inválido (formato: (XX) XXXXX-XXXX)');
+const nameSchema = z.string().min(3, 'Nome deve ter pelo menos 3 caracteres');
+const citySchema = z.string().min(2, 'Cidade deve ter pelo menos 2 caracteres');
+
+type UsageType = 'personal' | 'business' | 'multiple_businesses';
+
+interface FormErrors {
+  email?: string;
+  password?: string;
+  fullName?: string;
+  cpf?: string;
+  phone?: string;
+  city?: string;
+  usageType?: string;
+}
+
+const formatCPF = (value: string) => {
+  const numbers = value.replace(/\D/g, '').slice(0, 11);
+  if (numbers.length <= 3) return numbers;
+  if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
+  if (numbers.length <= 9) return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
+  return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9)}`;
+};
+
+const formatPhone = (value: string) => {
+  const numbers = value.replace(/\D/g, '').slice(0, 11);
+  if (numbers.length <= 2) return numbers.length ? `(${numbers}` : '';
+  if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+  if (numbers.length <= 10) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+  return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
+};
 
 export default function Auth() {
   const { user, signIn, signUp, loading: authLoading } = useAuth();
@@ -20,7 +53,11 @@ export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [cpf, setCpf] = useState('');
+  const [phone, setPhone] = useState('');
+  const [city, setCity] = useState('');
+  const [usageType, setUsageType] = useState<UsageType>('personal');
+  const [errors, setErrors] = useState<FormErrors>({});
 
   useEffect(() => {
     if (user) {
@@ -28,8 +65,8 @@ export default function Auth() {
     }
   }, [user, navigate]);
 
-  const validate = () => {
-    const newErrors: { email?: string; password?: string } = {};
+  const validateLogin = () => {
+    const newErrors: FormErrors = {};
     
     try {
       emailSchema.parse(email);
@@ -51,10 +88,70 @@ export default function Auth() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const validateSignUp = () => {
+    const newErrors: FormErrors = {};
+    
+    try {
+      nameSchema.parse(fullName);
+    } catch (e) {
+      if (e instanceof z.ZodError) {
+        newErrors.fullName = e.errors[0].message;
+      }
+    }
+
+    try {
+      emailSchema.parse(email);
+    } catch (e) {
+      if (e instanceof z.ZodError) {
+        newErrors.email = e.errors[0].message;
+      }
+    }
+
+    try {
+      passwordSchema.parse(password);
+    } catch (e) {
+      if (e instanceof z.ZodError) {
+        newErrors.password = e.errors[0].message;
+      }
+    }
+
+    try {
+      cpfSchema.parse(cpf);
+    } catch (e) {
+      if (e instanceof z.ZodError) {
+        newErrors.cpf = e.errors[0].message;
+      }
+    }
+
+    try {
+      phoneSchema.parse(phone);
+    } catch (e) {
+      if (e instanceof z.ZodError) {
+        newErrors.phone = e.errors[0].message;
+      }
+    }
+
+    try {
+      citySchema.parse(city);
+    } catch (e) {
+      if (e instanceof z.ZodError) {
+        newErrors.city = e.errors[0].message;
+      }
+    }
+
+    if (!usageType) {
+      newErrors.usageType = 'Selecione o tipo de uso';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validate()) return;
+    const isValid = isLogin ? validateLogin() : validateSignUp();
+    if (!isValid) return;
     
     setLoading(true);
 
@@ -82,7 +179,17 @@ export default function Auth() {
           });
         }
       } else {
-        const { error } = await signUp(email, password, fullName);
+        const signUpData: SignUpData = {
+          email,
+          password,
+          fullName,
+          cpf,
+          phone,
+          city,
+          usageType
+        };
+        
+        const { error } = await signUp(signUpData);
         if (error) {
           if (error.message.includes('already registered')) {
             toast({
@@ -107,6 +214,22 @@ export default function Auth() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const resetForm = () => {
+    setEmail('');
+    setPassword('');
+    setFullName('');
+    setCpf('');
+    setPhone('');
+    setCity('');
+    setUsageType('personal');
+    setErrors({});
+  };
+
+  const handleToggleMode = () => {
+    setIsLogin(!isLogin);
+    resetForm();
   };
 
   if (authLoading) {
@@ -135,21 +258,132 @@ export default function Auth() {
         <div className="bg-card rounded-2xl border border-border p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
-              <div>
-                <Label className="text-sm text-foreground mb-1.5 block">Nome completo</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder="Seu nome"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="pl-10 bg-muted/30 border-border"
-                  />
+              <>
+                {/* Full Name */}
+                <div>
+                  <Label className="text-sm text-foreground mb-1.5 block">Nome completo</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Seu nome completo"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="pl-10 bg-muted/30 border-border"
+                      aria-label="Nome completo"
+                    />
+                  </div>
+                  {errors.fullName && (
+                    <p className="text-sm text-destructive mt-1">{errors.fullName}</p>
+                  )}
                 </div>
-              </div>
+
+                {/* CPF */}
+                <div>
+                  <Label className="text-sm text-foreground mb-1.5 block">CPF</Label>
+                  <div className="relative">
+                    <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="000.000.000-00"
+                      value={cpf}
+                      onChange={(e) => setCpf(formatCPF(e.target.value))}
+                      className="pl-10 bg-muted/30 border-border"
+                      aria-label="CPF"
+                    />
+                  </div>
+                  {errors.cpf && (
+                    <p className="text-sm text-destructive mt-1">{errors.cpf}</p>
+                  )}
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <Label className="text-sm text-foreground mb-1.5 block">Telefone</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="(00) 00000-0000"
+                      value={phone}
+                      onChange={(e) => setPhone(formatPhone(e.target.value))}
+                      className="pl-10 bg-muted/30 border-border"
+                      aria-label="Telefone"
+                    />
+                  </div>
+                  {errors.phone && (
+                    <p className="text-sm text-destructive mt-1">{errors.phone}</p>
+                  )}
+                </div>
+
+                {/* City */}
+                <div>
+                  <Label className="text-sm text-foreground mb-1.5 block">Cidade</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Sua cidade"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="pl-10 bg-muted/30 border-border"
+                      aria-label="Cidade"
+                    />
+                  </div>
+                  {errors.city && (
+                    <p className="text-sm text-destructive mt-1">{errors.city}</p>
+                  )}
+                </div>
+
+                {/* Usage Type */}
+                <div>
+                  <Label className="text-sm text-foreground mb-3 block">Para qual uso?</Label>
+                  <RadioGroup
+                    value={usageType}
+                    onValueChange={(value) => setUsageType(value as UsageType)}
+                    className="space-y-2"
+                  >
+                    <div className="flex items-center space-x-3 p-3 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer">
+                      <RadioGroupItem value="personal" id="personal" />
+                      <Label htmlFor="personal" className="flex items-center gap-2 cursor-pointer flex-1">
+                        <User className="w-4 h-4 text-muted-foreground" />
+                        <div>
+                          <p className="font-medium text-foreground">Uso pessoal</p>
+                          <p className="text-xs text-muted-foreground">Para gerenciar suas próprias redes sociais</p>
+                        </div>
+                      </Label>
+                    </div>
+                    
+                    <div className="flex items-center space-x-3 p-3 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer">
+                      <RadioGroupItem value="business" id="business" />
+                      <Label htmlFor="business" className="flex items-center gap-2 cursor-pointer flex-1">
+                        <Building2 className="w-4 h-4 text-muted-foreground" />
+                        <div>
+                          <p className="font-medium text-foreground">Uma empresa</p>
+                          <p className="text-xs text-muted-foreground">Para gerenciar redes de uma empresa</p>
+                        </div>
+                      </Label>
+                    </div>
+                    
+                    <div className="flex items-center space-x-3 p-3 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer">
+                      <RadioGroupItem value="multiple_businesses" id="multiple_businesses" />
+                      <Label htmlFor="multiple_businesses" className="flex items-center gap-2 cursor-pointer flex-1">
+                        <Users className="w-4 h-4 text-muted-foreground" />
+                        <div>
+                          <p className="font-medium text-foreground">Várias empresas</p>
+                          <p className="text-xs text-muted-foreground">Para agências ou múltiplos clientes</p>
+                        </div>
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                  {errors.usageType && (
+                    <p className="text-sm text-destructive mt-1">{errors.usageType}</p>
+                  )}
+                </div>
+              </>
             )}
 
+            {/* Email */}
             <div>
               <Label className="text-sm text-foreground mb-1.5 block">Email</Label>
               <div className="relative">
@@ -160,6 +394,7 @@ export default function Auth() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10 bg-muted/30 border-border"
+                  aria-label="Email"
                 />
               </div>
               {errors.email && (
@@ -167,6 +402,7 @@ export default function Auth() {
               )}
             </div>
 
+            {/* Password */}
             <div>
               <Label className="text-sm text-foreground mb-1.5 block">Senha</Label>
               <div className="relative">
@@ -177,6 +413,7 @@ export default function Auth() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10 bg-muted/30 border-border"
+                  aria-label="Senha"
                 />
               </div>
               {errors.password && (
@@ -199,7 +436,7 @@ export default function Auth() {
           <div className="mt-6 text-center">
             <button
               type="button"
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={handleToggleMode}
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               {isLogin ? (
