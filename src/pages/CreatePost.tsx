@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { NetworkBadge } from '@/components/ui/NetworkBadge';
+import { PostPreviewGrid } from '@/components/post/PostPreview';
 import { NetworkType, getNetworkName } from '@/data/mockData';
 import { useCreatePost } from '@/hooks/useScheduledPosts';
 import { useSocialConnections } from '@/hooks/useSocialConnections';
@@ -430,43 +431,18 @@ export default function CreatePost() {
           {/* Preview */}
           <div className="space-y-4">
             <div className="sticky top-4">
-              <Label className="text-sm font-medium text-foreground mb-3 block">
-                Preview
-              </Label>
-              
-              {selectedNetworks.map(network => (
-                <div 
-                  key={network} 
-                  className="bg-card rounded-2xl border border-border p-4 mb-4"
-                >
-                  <div className="flex items-center gap-3 mb-4">
-                    <NetworkBadge network={network} size="sm" />
-                  </div>
-                  
-                  {/* Mock post preview */}
-                  <div className="bg-muted/30 rounded-xl p-4">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-full bg-muted" />
-                      <div>
-                        <div className="font-medium text-foreground text-sm">@agendasaas</div>
-                        <div className="text-xs text-muted-foreground">Agora</div>
-                      </div>
-                    </div>
-                    
-                    {imagePreview && (
-                      <img 
-                        src={imagePreview} 
-                        alt="Preview" 
-                        className="w-full aspect-square object-cover rounded-lg mb-3"
-                      />
-                    )}
-                    
-                    <p className="text-sm text-foreground whitespace-pre-wrap">
-                      {content || 'Seu texto aparecerá aqui...'}
-                    </p>
-                  </div>
-                </div>
-              ))}
+              <div className="bg-card rounded-2xl border border-border p-4">
+                <Label className="text-sm font-medium text-foreground mb-4 block">
+                  Preview nas Redes Sociais
+                </Label>
+                
+                <PostPreviewGrid
+                  networks={selectedNetworks}
+                  content={content}
+                  imageUrl={imagePreview || undefined}
+                  username="sua_conta"
+                />
+              </div>
             </div>
           </div>
         </div>
