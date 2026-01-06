@@ -1,4 +1,4 @@
-export type NetworkType = 'instagram' | 'facebook' | 'twitter' | 'linkedin';
+export type NetworkType = 'instagram' | 'facebook' | 'google' | 'tiktok' | 'youtube';
 
 export type PostStatus = 'scheduled' | 'published' | 'draft';
 
@@ -62,8 +62,9 @@ export const mediaFiles: MediaFile[] = [
 export const connectedNetworks: ConnectedNetwork[] = [
   { id: '1', network: 'instagram', username: '', followers: 0, connected: false, avatar: '' },
   { id: '2', network: 'facebook', username: '', followers: 0, connected: false, avatar: '' },
-  { id: '3', network: 'twitter', username: '', followers: 0, connected: false, avatar: '' },
-  { id: '4', network: 'linkedin', username: '', followers: 0, connected: false, avatar: '' },
+  { id: '3', network: 'google', username: '', followers: 0, connected: false, avatar: '' },
+  { id: '4', network: 'tiktok', username: '', followers: 0, connected: false, avatar: '' },
+  { id: '5', network: 'youtube', username: '', followers: 0, connected: false, avatar: '' },
 ];
 
 export const bestTimes = [
@@ -85,8 +86,9 @@ export const analyticsData = {
   networkStats: [
     { network: 'instagram' as NetworkType, posts: 0, engagement: 0, followers: 0 },
     { network: 'facebook' as NetworkType, posts: 0, engagement: 0, followers: 0 },
-    { network: 'twitter' as NetworkType, posts: 0, engagement: 0, followers: 0 },
-    { network: 'linkedin' as NetworkType, posts: 0, engagement: 0, followers: 0 },
+    { network: 'google' as NetworkType, posts: 0, engagement: 0, followers: 0 },
+    { network: 'tiktok' as NetworkType, posts: 0, engagement: 0, followers: 0 },
+    { network: 'youtube' as NetworkType, posts: 0, engagement: 0, followers: 0 },
   ],
   weeklyData: [
     { day: 'Seg', posts: 0, engagement: 0 },
@@ -103,8 +105,9 @@ export const getNetworkColor = (network: NetworkType): string => {
   const colors = {
     instagram: 'hsl(330, 80%, 60%)',
     facebook: 'hsl(220, 70%, 55%)',
-    twitter: 'hsl(200, 90%, 55%)',
-    linkedin: 'hsl(210, 80%, 50%)',
+    google: 'hsl(4, 80%, 55%)',
+    tiktok: 'hsl(180, 80%, 40%)',
+    youtube: 'hsl(0, 80%, 50%)',
   };
   return colors[network];
 };
@@ -113,8 +116,9 @@ export const getNetworkName = (network: NetworkType): string => {
   const names = {
     instagram: 'Instagram',
     facebook: 'Facebook',
-    twitter: 'Twitter',
-    linkedin: 'LinkedIn',
+    google: 'Google',
+    tiktok: 'TikTok',
+    youtube: 'YouTube',
   };
   return names[network];
 };

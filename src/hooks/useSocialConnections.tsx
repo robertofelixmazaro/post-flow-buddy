@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { NetworkType } from '@/data/mockData';
 
 export interface SocialConnection {
   id: string;
   user_id: string;
-  network: 'instagram' | 'facebook' | 'twitter' | 'linkedin';
+  network: NetworkType;
   account_id: string;
   account_name: string | null;
   account_username: string | null;
@@ -52,8 +53,7 @@ export function useDisconnectSocial() {
 }
 
 // OAuth URLs for each platform
-export function getOAuthUrl(network: string): string {
-  const baseUrl = `${window.location.origin}`;
+export function getOAuthUrl(network: NetworkType): string {
   const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/oauth-callback`;
   
   switch (network) {
@@ -65,13 +65,17 @@ export function getOAuthUrl(network: string): string {
       // Instagram uses Facebook OAuth with instagram permissions
       return `https://www.facebook.com/v18.0/dialog/oauth?client_id=YOUR_APP_ID&redirect_uri=${encodeURIComponent(redirectUri)}&scope=instagram_basic,instagram_content_publish,pages_show_list&state=${network}`;
     
-    case 'twitter':
-      // X/Twitter OAuth 2.0
-      return `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=YOUR_CLIENT_ID&redirect_uri=${encodeURIComponent(redirectUri)}&scope=tweet.read%20tweet.write%20users.read&state=${network}&code_challenge=challenge&code_challenge_method=plain`;
+    case 'google':
+      // Google Business Profile OAuth
+      return `https://accounts.google.com/o/oauth2/v2/auth?client_id=YOUR_CLIENT_ID&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=https://www.googleapis.com/auth/business.manage&state=${network}`;
     
-    case 'linkedin':
-      // LinkedIn OAuth
-      return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=YOUR_CLIENT_ID&redirect_uri=${encodeURIComponent(redirectUri)}&scope=w_member_social&state=${network}`;
+    case 'tiktok':
+      // TikTok OAuth
+      return `https://www.tiktok.com/v2/auth/authorize?client_key=YOUR_CLIENT_KEY&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=user.info.basic,video.publish&state=${network}`;
+    
+    case 'youtube':
+      // YouTube OAuth (via Google)
+      return `https://accounts.google.com/o/oauth2/v2/auth?client_id=YOUR_CLIENT_ID&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=https://www.googleapis.com/auth/youtube.upload&state=${network}`;
     
     default:
       return '#';
