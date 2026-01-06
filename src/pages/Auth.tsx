@@ -284,9 +284,11 @@ export default function Auth() {
           }
         } else {
           toast({
-            title: "Conta criada!",
-            description: "Você já pode começar a usar o Agendasaas."
+            title: "Verifique seu email!",
+            description: "Enviamos um link de confirmação para seu email. Clique nele para ativar sua conta."
           });
+          setIsLogin(true);
+          resetForm();
         }
       }
     } finally {
