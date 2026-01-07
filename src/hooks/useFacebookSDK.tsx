@@ -84,50 +84,59 @@ export function useFacebookSDK() {
 
     // Set the app ID for the SDK
     window.__FB_APP_ID__ = appId;
+    
+    let intervalId: ReturnType<typeof setInterval> | null = null;
 
-    const initSDK = () => {
-      if (window.FB) {
-        try {
-          window.FB.init({
-            appId,
-            cookie: true,
-            xfbml: true,
-            version: 'v18.0'
-          });
-          console.log('Facebook SDK initialized/re-initialized');
-          setIsReady(true);
-        } catch (e) {
-          console.error('Error initializing FB SDK:', e);
-        }
+    const markReady = () => {
+      console.log('Facebook SDK is ready');
+      setIsReady(true);
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
       }
     };
 
-    // Check if SDK is already loaded and ready
+    // Check if SDK is already loaded and initialized
     if (window.FB) {
-      initSDK();
-    } else {
-      // Wait for SDK to load
-      const handleSDKReady = () => {
-        console.log('fb-sdk-ready event received');
-        initSDK();
-      };
-      
-      window.addEventListener('fb-sdk-ready', handleSDKReady);
-      
-      // Also check periodically in case event was missed
-      const checkInterval = setInterval(() => {
-        if (window.FB) {
-          console.log('FB SDK detected via interval check');
-          initSDK();
-          clearInterval(checkInterval);
-        }
-      }, 500);
-
-      return () => {
-        window.removeEventListener('fb-sdk-ready', handleSDKReady);
-        clearInterval(checkInterval);
-      };
+      console.log('FB SDK already available');
+      markReady();
+      return;
     }
+    
+    // Wait for SDK to load
+    const handleSDKReady = () => {
+      console.log('fb-sdk-ready event received');
+      if (window.FB) {
+        markReady();
+      }
+    };
+    
+    window.addEventListener('fb-sdk-ready', handleSDKReady);
+    
+    // Also check periodically in case event was missed (max 10 seconds)
+    let attempts = 0;
+    const maxAttempts = 20;
+    
+    intervalId = setInterval(() => {
+      attempts++;
+      if (window.FB) {
+        console.log('FB SDK detected via interval check');
+        markReady();
+      } else if (attempts >= maxAttempts) {
+        console.warn('FB SDK failed to load after 10 seconds');
+        if (intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+      }
+    }, 500);
+
+    return () => {
+      window.removeEventListener('fb-sdk-ready', handleSDKReady);
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, [appId]);
 
   const loginWithFacebook = useCallback(async (type: 'facebook' | 'instagram' = 'facebook') => {
