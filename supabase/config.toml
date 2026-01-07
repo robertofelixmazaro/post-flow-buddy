@@ -1,1 +1,7 @@
 project_id = "onhbayoqoddpdatjmwnj"
+
+[functions.oauth-callback]
+verify_jwt = false
+
+[functions.publish-post]
+verify_jwt = false
