@@ -12,6 +12,7 @@ import MediaLibrary from "./pages/MediaLibrary";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Schedules from "./pages/Schedules";
+import PublicationLogs from "./pages/PublicationLogs";
 import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -35,6 +36,7 @@ const App = () => (
               <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               <Route path="/criar" element={<ProtectedRoute><CreatePost /></ProtectedRoute>} />
               <Route path="/agendamentos" element={<ProtectedRoute><Schedules /></ProtectedRoute>} />
+              <Route path="/logs" element={<ProtectedRoute><PublicationLogs /></ProtectedRoute>} />
               <Route path="/biblioteca" element={<ProtectedRoute><MediaLibrary /></ProtectedRoute>} />
               <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
               <Route path="/perfil" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
