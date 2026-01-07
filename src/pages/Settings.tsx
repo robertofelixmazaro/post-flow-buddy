@@ -22,7 +22,8 @@ import {
   ExternalLink,
   Loader2,
   AlertTriangle,
-  Facebook
+  Facebook,
+  Copy
 } from 'lucide-react';
 import {
   Dialog,
@@ -595,6 +596,31 @@ export default function Settings() {
               </li>
             </ul>
           </div>
+          {isEmbedded && selectedNetworkForOAuth && isOAuthConfigured(selectedNetworkForOAuth as any) && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border">
+              <p className="text-sm text-muted-foreground flex-1">
+                Pop-ups bloqueados? Copie o link e cole no navegador:
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 shrink-0"
+                onClick={() => {
+                  const url = getOAuthUrl(selectedNetworkForOAuth as any, user?.id);
+                  if (url) {
+                    navigator.clipboard.writeText(url);
+                    toast({
+                      title: "Link copiado!",
+                      description: "Cole o link no seu navegador para fazer login.",
+                    });
+                  }
+                }}
+              >
+                <Copy className="w-4 h-4" />
+                Copiar link
+              </Button>
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setOauthInfoOpen(false)}>
               Cancelar
