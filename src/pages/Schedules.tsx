@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { useScheduledPosts, useUpdatePostStatus } from '@/hooks/useScheduledPosts';
 import { NetworkBadge } from '@/components/ui/NetworkBadge';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -20,7 +21,8 @@ import {
   XCircle,
   Loader2,
   Eye,
-  ChevronDown
+  ChevronDown,
+  Send
 } from 'lucide-react';
 import {
   Select,
@@ -66,6 +68,7 @@ export default function Schedules() {
   const [logDialogOpen, setLogDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [postToCancel, setPostToCancel] = useState<string | null>(null);
+  const [publishingPostId, setPublishingPostId] = useState<string | null>(null);
 
   const filteredPosts = posts?.filter(post => {
     const matchesSearch = post.content.toLowerCase().includes(searchTerm.toLowerCase());
@@ -108,6 +111,54 @@ export default function Schedules() {
         description: "Não foi possível reagendar o post.",
         variant: "destructive"
       });
+    }
+  };
+
+  const handlePublishNow = async (postId: string) => {
+    setPublishingPostId(postId);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('publish-post', {
+        body: { postId }
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+      
+      const { summary, results } = data;
+      
+      if (summary.failed === 0) {
+        toast({
+          title: "Publicado com sucesso!",
+          description: `Post publicado em ${summary.published} rede(s).`
+        });
+      } else if (summary.published > 0) {
+        toast({
+          title: "Publicação parcial",
+          description: `${summary.published} sucesso, ${summary.failed} falha(s). Verifique os logs.`,
+          variant: "destructive"
+        });
+      } else {
+        const errorMessages = results
+          .filter((r: any) => r.status === 'failed')
+          .map((r: any) => `${r.network}: ${r.error}`)
+          .join('; ');
+        throw new Error(errorMessages || 'Falha na publicação');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      toast({
+        title: "Erro na publicação",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setPublishingPostId(null);
     }
   };
 
@@ -269,6 +320,18 @@ export default function Schedules() {
                           
                           {post.status === 'scheduled' && (
                             <>
+                              <DropdownMenuItem 
+                                onClick={() => handlePublishNow(post.id)}
+                                disabled={publishingPostId === post.id}
+                                className="text-primary"
+                              >
+                                {publishingPostId === post.id ? (
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Send className="w-4 h-4 mr-2" />
+                                )}
+                                Publicar Agora
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => window.location.href = `/criar?edit=${post.id}`}>
                                 <Edit2 className="w-4 h-4 mr-2" />
                                 Editar
