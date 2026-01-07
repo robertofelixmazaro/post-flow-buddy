@@ -78,34 +78,56 @@ export function useFacebookSDK() {
 
   useEffect(() => {
     if (!appId) {
-      console.warn('VITE_FACEBOOK_APP_ID not configured');
+      console.warn('Facebook App ID not configured');
       return;
     }
 
     // Set the app ID for the SDK
     window.__FB_APP_ID__ = appId;
 
-    const handleSDKReady = () => {
-      setIsReady(true);
+    const initSDK = () => {
+      if (window.FB) {
+        try {
+          window.FB.init({
+            appId,
+            cookie: true,
+            xfbml: true,
+            version: 'v18.0'
+          });
+          console.log('Facebook SDK initialized/re-initialized');
+          setIsReady(true);
+        } catch (e) {
+          console.error('Error initializing FB SDK:', e);
+        }
+      }
     };
 
-    // Check if SDK is already loaded
+    // Check if SDK is already loaded and ready
     if (window.FB) {
-      // Re-init with our app ID
-      window.FB.init({
-        appId,
-        cookie: true,
-        xfbml: true,
-        version: 'v18.0'
-      });
-      setIsReady(true);
+      initSDK();
     } else {
+      // Wait for SDK to load
+      const handleSDKReady = () => {
+        console.log('fb-sdk-ready event received');
+        initSDK();
+      };
+      
       window.addEventListener('fb-sdk-ready', handleSDKReady);
-    }
+      
+      // Also check periodically in case event was missed
+      const checkInterval = setInterval(() => {
+        if (window.FB) {
+          console.log('FB SDK detected via interval check');
+          initSDK();
+          clearInterval(checkInterval);
+        }
+      }, 500);
 
-    return () => {
-      window.removeEventListener('fb-sdk-ready', handleSDKReady);
-    };
+      return () => {
+        window.removeEventListener('fb-sdk-ready', handleSDKReady);
+        clearInterval(checkInterval);
+      };
+    }
   }, [appId]);
 
   const loginWithFacebook = useCallback(async (type: 'facebook' | 'instagram' = 'facebook') => {
