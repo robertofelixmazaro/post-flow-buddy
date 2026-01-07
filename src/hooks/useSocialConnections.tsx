@@ -53,25 +53,29 @@ export function useDisconnectSocial() {
 }
 
 // OAuth URLs for each platform
-export function getOAuthUrl(network: NetworkType): string {
-  const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/oauth-callback`;
+export function getOAuthUrl(network: NetworkType, userId?: string): string {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
+  
+  // Encode state with network and user info
+  const state = btoa(JSON.stringify({ network, userId }));
   
   switch (network) {
     case 'facebook':
-      // Meta OAuth - requires Facebook App ID
-      return `https://www.facebook.com/v18.0/dialog/oauth?client_id=YOUR_APP_ID&redirect_uri=${encodeURIComponent(redirectUri)}&scope=pages_manage_posts,pages_read_engagement,pages_show_list&state=${network}`;
+      // Meta OAuth - App ID will be used by the edge function
+      return `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_FACEBOOK_APP_ID || 'CONFIGURE_APP_ID'}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=pages_manage_posts,pages_read_engagement,pages_show_list&state=${state}`;
     
     case 'instagram':
       // Instagram uses Facebook OAuth with instagram permissions
-      return `https://www.facebook.com/v18.0/dialog/oauth?client_id=YOUR_APP_ID&redirect_uri=${encodeURIComponent(redirectUri)}&scope=instagram_basic,instagram_content_publish,pages_show_list&state=${network}`;
+      return `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_FACEBOOK_APP_ID || 'CONFIGURE_APP_ID'}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=instagram_basic,instagram_content_publish,pages_show_list,business_management&state=${state}`;
     
     case 'tiktok':
       // TikTok OAuth
-      return `https://www.tiktok.com/v2/auth/authorize?client_key=YOUR_CLIENT_KEY&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=user.info.basic,video.publish&state=${network}`;
+      return `https://www.tiktok.com/v2/auth/authorize?client_key=${import.meta.env.VITE_TIKTOK_CLIENT_KEY || 'CONFIGURE_CLIENT_KEY'}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=user.info.basic,video.publish&state=${state}`;
     
     case 'linkedin':
-      // LinkedIn OAuth
-      return `https://www.linkedin.com/oauth/v2/authorization?client_id=YOUR_CLIENT_ID&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=w_member_social&state=${network}`;
+      // LinkedIn OAuth with OpenID Connect
+      return `https://www.linkedin.com/oauth/v2/authorization?client_id=${import.meta.env.VITE_LINKEDIN_CLIENT_ID || 'CONFIGURE_CLIENT_ID'}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20profile%20w_member_social&state=${state}`;
     
     default:
       return '#';
