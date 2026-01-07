@@ -60,7 +60,15 @@ export default function Settings() {
   const [searchParams] = useSearchParams();
   const { data: connections, isLoading: loadingConnections } = useSocialConnections();
   const disconnectSocial = useDisconnectSocial();
-  const { isReady: fbReady, isLoading: fbLoading, loginWithFacebook, isConfigured: fbConfigured } = useFacebookSDK();
+  const { 
+    isReady: fbReady, 
+    isLoading: fbLoading, 
+    loginWithFacebook, 
+    isConfigured: fbConfigured,
+    pageSelectionData,
+    confirmPageSelection,
+    cancelPageSelection
+  } = useFacebookSDK();
   
   const [activeSection, setActiveSection] = useState('profile');
   const [notifications, setNotifications] = useState({
@@ -73,6 +81,7 @@ export default function Settings() {
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   const [oauthInfoOpen, setOauthInfoOpen] = useState(false);
   const [selectedNetworkForOAuth, setSelectedNetworkForOAuth] = useState<string | null>(null);
+  const [selectingPage, setSelectingPage] = useState(false);
 
   // Check for OAuth callback results
   useEffect(() => {
@@ -113,10 +122,34 @@ export default function Settings() {
   const handleFacebookSDKLogin = async (type: 'facebook' | 'instagram') => {
     const result = await loginWithFacebook(type);
     
+    if (result.needsPageSelection) {
+      // Dialog will show automatically via pageSelectionData
+      return;
+    }
+    
     if (result.success) {
       toast({
         title: "Rede conectada!",
         description: `${getNetworkName(type)} foi conectado com sucesso.`,
+      });
+    } else {
+      toast({
+        title: "Erro na conexão",
+        description: result.error || "Não foi possível conectar a conta.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handlePageSelect = async (page: any) => {
+    setSelectingPage(true);
+    const result = await confirmPageSelection(page);
+    setSelectingPage(false);
+    
+    if (result.success) {
+      toast({
+        title: "Rede conectada!",
+        description: `${pageSelectionData?.type === 'instagram' ? 'Instagram' : 'Facebook'} foi conectado com sucesso.`,
       });
     } else {
       toast({
@@ -551,6 +584,62 @@ export default function Settings() {
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : null}
               Desconectar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Page Selection Dialog */}
+      <Dialog open={!!pageSelectionData} onOpenChange={(open) => !open && cancelPageSelection()}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Selecionar {pageSelectionData?.type === 'instagram' ? 'Conta Instagram' : 'Página do Facebook'}
+            </DialogTitle>
+            <DialogDescription>
+              {pageSelectionData?.type === 'instagram' 
+                ? 'Escolha qual conta Instagram você deseja conectar:'
+                : 'Escolha qual página do Facebook você deseja conectar:'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-3 max-h-[400px] overflow-y-auto">
+            {pageSelectionData?.pages.map((page) => (
+              <button
+                key={page.id}
+                onClick={() => handlePageSelect(page)}
+                disabled={selectingPage || fbLoading}
+                className="w-full flex items-center gap-4 p-4 rounded-xl bg-muted/30 border border-border hover:border-primary hover:bg-primary/5 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  {pageSelectionData.type === 'instagram' && page.instagram_business_account ? (
+                    <span className="text-lg font-semibold text-primary">
+                      {page.instagram_business_account.username.charAt(0).toUpperCase()}
+                    </span>
+                  ) : (
+                    <Facebook className="w-6 h-6 text-primary" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-foreground truncate">
+                    {pageSelectionData.type === 'instagram' && page.instagram_business_account
+                      ? `@${page.instagram_business_account.username}`
+                      : page.name}
+                  </div>
+                  <div className="text-sm text-muted-foreground truncate">
+                    {pageSelectionData.type === 'instagram'
+                      ? `Página: ${page.name}`
+                      : page.category}
+                  </div>
+                </div>
+                {(selectingPage || fbLoading) && (
+                  <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                )}
+              </button>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelPageSelection} disabled={selectingPage}>
+              Cancelar
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -45,23 +45,30 @@ interface FacebookLoginResponse {
   authResponse: FacebookAuthResponse | null;
 }
 
-interface FacebookPage {
+export interface FacebookPage {
   id: string;
   name: string;
   access_token: string;
   category: string;
+  instagram_business_account?: {
+    id: string;
+    username: string;
+    name?: string;
+  };
 }
 
-interface InstagramAccount {
-  id: string;
-  username: string;
-  name?: string;
+export interface PageSelectionData {
+  type: 'facebook' | 'instagram';
+  pages: FacebookPage[];
+  userInfo: { id: string; name: string };
+  expiresIn: number;
 }
 
 export function useFacebookSDK() {
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pageSelectionData, setPageSelectionData] = useState<PageSelectionData | null>(null);
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -117,12 +124,12 @@ export function useFacebookSDK() {
       ? 'instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement,business_management'
       : 'pages_manage_posts,pages_read_engagement,pages_show_list,public_profile';
 
-    return new Promise<{ success: boolean; error?: string }>((resolve) => {
+    return new Promise<{ success: boolean; error?: string; needsPageSelection?: boolean }>((resolve) => {
       window.FB.login(
         async (response) => {
           if (response.status === 'connected' && response.authResponse) {
             try {
-              const result = await handleSuccessfulLogin(response.authResponse, type);
+              const result = await fetchPagesForSelection(response.authResponse, type);
               resolve(result);
             } catch (err: any) {
               setError(err.message);
@@ -139,88 +146,126 @@ export function useFacebookSDK() {
     });
   }, [isReady, user]);
 
-  const handleSuccessfulLogin = async (
+  const fetchPagesForSelection = async (
     authResponse: FacebookAuthResponse,
     type: 'facebook' | 'instagram'
-  ): Promise<{ success: boolean; error?: string }> => {
+  ): Promise<{ success: boolean; error?: string; needsPageSelection?: boolean }> => {
     if (!user) {
       return { success: false, error: 'User not authenticated' };
     }
 
-    const { accessToken, userID, expiresIn } = authResponse;
+    const { expiresIn } = authResponse;
 
     // Get user info
     const userInfo = await new Promise<any>((resolve) => {
       window.FB.api('/me', { fields: 'id,name' }, resolve);
     });
 
-    if (type === 'facebook') {
-      // Get pages the user manages
-      const pagesResponse = await new Promise<any>((resolve) => {
-        window.FB.api('/me/accounts', { fields: 'id,name,access_token,category' }, resolve);
-      });
-
-      if (!pagesResponse.data || pagesResponse.data.length === 0) {
-        return { success: false, error: 'Nenhuma página encontrada. Você precisa ter uma Página do Facebook.' };
-      }
-
-      // Use the first page (you could let user choose)
-      const page: FacebookPage = pagesResponse.data[0];
-
-      // Save connection to database
-      await saveConnection({
-        network: 'facebook',
-        accessToken: page.access_token,
-        accountId: userID,
-        accountName: userInfo.name,
-        pageId: page.id,
-        pageName: page.name,
-        expiresIn
-      });
-
-      return { success: true };
-    } else {
-      // Instagram - need to get Instagram Business Account linked to a page
-      const pagesResponse = await new Promise<any>((resolve) => {
-        window.FB.api(
-          '/me/accounts',
-          { fields: 'id,name,access_token,instagram_business_account{id,username,name}' },
-          resolve
-        );
-      });
-
-      if (!pagesResponse.data || pagesResponse.data.length === 0) {
-        return { success: false, error: 'Nenhuma página encontrada.' };
-      }
-
-      // Find page with Instagram account
-      const pageWithInstagram = pagesResponse.data.find(
-        (p: any) => p.instagram_business_account
+    // Get pages with Instagram info
+    const pagesResponse = await new Promise<any>((resolve) => {
+      window.FB.api(
+        '/me/accounts',
+        { fields: 'id,name,access_token,category,instagram_business_account{id,username,name}' },
+        resolve
       );
+    });
 
-      if (!pageWithInstagram) {
+    if (!pagesResponse.data || pagesResponse.data.length === 0) {
+      return { 
+        success: false, 
+        error: type === 'instagram' 
+          ? 'Nenhuma página encontrada. Vincule sua conta Instagram a uma Página do Facebook.'
+          : 'Nenhuma página encontrada. Você precisa ter uma Página do Facebook.' 
+      };
+    }
+
+    let availablePages: FacebookPage[] = pagesResponse.data;
+
+    // For Instagram, filter only pages with Instagram accounts
+    if (type === 'instagram') {
+      availablePages = pagesResponse.data.filter((p: any) => p.instagram_business_account);
+      
+      if (availablePages.length === 0) {
         return {
           success: false,
           error: 'Nenhuma conta Instagram Business vinculada. Vincule sua conta Instagram a uma Página do Facebook.'
         };
       }
+    }
 
-      const igAccount: InstagramAccount = pageWithInstagram.instagram_business_account;
+    // If only one page, auto-select it
+    if (availablePages.length === 1) {
+      return await selectPage(availablePages[0], type, userInfo, expiresIn);
+    }
 
-      await saveConnection({
-        network: 'instagram',
-        accessToken: pageWithInstagram.access_token,
-        accountId: igAccount.id,
-        accountName: igAccount.name || igAccount.username,
-        accountUsername: igAccount.username,
-        pageId: pageWithInstagram.id,
-        pageName: pageWithInstagram.name,
-        expiresIn
-      });
+    // Multiple pages - show selection dialog
+    setPageSelectionData({
+      type,
+      pages: availablePages,
+      userInfo,
+      expiresIn
+    });
 
+    return { success: true, needsPageSelection: true };
+  };
+
+  const selectPage = async (
+    page: FacebookPage,
+    type: 'facebook' | 'instagram',
+    userInfo: { id: string; name: string },
+    expiresIn: number
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      if (type === 'facebook') {
+        await saveConnection({
+          network: 'facebook',
+          accessToken: page.access_token,
+          accountId: userInfo.id,
+          accountName: userInfo.name,
+          pageId: page.id,
+          pageName: page.name,
+          expiresIn
+        });
+      } else {
+        // Instagram
+        const igAccount = page.instagram_business_account!;
+        await saveConnection({
+          network: 'instagram',
+          accessToken: page.access_token,
+          accountId: igAccount.id,
+          accountName: igAccount.name || igAccount.username,
+          accountUsername: igAccount.username,
+          pageId: page.id,
+          pageName: page.name,
+          expiresIn
+        });
+      }
+
+      setPageSelectionData(null);
       return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
   };
+
+  const confirmPageSelection = useCallback(async (page: FacebookPage) => {
+    if (!pageSelectionData) return { success: false, error: 'No selection data' };
+
+    setIsLoading(true);
+    const result = await selectPage(
+      page,
+      pageSelectionData.type,
+      pageSelectionData.userInfo,
+      pageSelectionData.expiresIn
+    );
+    setIsLoading(false);
+
+    return result;
+  }, [pageSelectionData]);
+
+  const cancelPageSelection = useCallback(() => {
+    setPageSelectionData(null);
+  }, []);
 
   const saveConnection = async (data: {
     network: 'facebook' | 'instagram';
@@ -284,6 +329,9 @@ export function useFacebookSDK() {
     error,
     isConfigured: !!appId,
     loginWithFacebook,
-    logout
+    logout,
+    pageSelectionData,
+    confirmPageSelection,
+    cancelPageSelection
   };
 }
