@@ -11,6 +11,7 @@ import { useSocialConnections, useDisconnectSocial, getOAuthUrl, isOAuthConfigur
 import { useFacebookSDK } from '@/hooks/useFacebookSDK';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { oauthConfig, getOAuthRedirectUri } from '@/config/oauth';
 import { 
   User, 
   Bell, 
@@ -46,6 +47,7 @@ const settingsSections = [
   { id: 'notifications', label: 'Notificações', icon: Bell },
   { id: 'security', label: 'Segurança', icon: Shield },
   { id: 'appearance', label: 'Aparência', icon: Palette },
+  { id: 'debug', label: 'Diagnóstico', icon: AlertTriangle },
 ];
 
 const availableNetworks = [
@@ -554,6 +556,92 @@ export default function Settings() {
                     <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
                       Ativo
                     </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Debug / Diagnostics */}
+            {activeSection === 'debug' && (
+              <div className="bg-card rounded-2xl border border-border p-6">
+                <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                  Diagnóstico OAuth
+                </h2>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Informações técnicas para depuração da integração com redes sociais.
+                </p>
+
+                {/* Redirect URI */}
+                <div className="mb-6">
+                  <h3 className="text-sm font-semibold text-foreground mb-2">Redirect URI (Callback)</h3>
+                  <div className="p-3 rounded-lg bg-muted/50 border border-border font-mono text-xs break-all">
+                    {getOAuthRedirectUri()}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Configure esta URL no painel do Facebook/TikTok/LinkedIn como "Valid OAuth Redirect URIs".
+                  </p>
+                </div>
+
+                {/* Keys Status */}
+                <div className="mb-6">
+                  <h3 className="text-sm font-semibold text-foreground mb-3">Status das Chaves</h3>
+                  <div className="space-y-2">
+                    {availableNetworks.map(network => {
+                      const configured = isOAuthConfigured(network.id as any);
+                      return (
+                        <div key={network.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border">
+                          <div className="flex items-center gap-3">
+                            <NetworkBadge network={network.id as any} size="sm" showLabel={false} />
+                            <span className="text-sm font-medium text-foreground">{network.name}</span>
+                          </div>
+                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${configured ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                            {configured ? '✓ Configurada' : '✗ Não configurada'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Facebook App ID */}
+                <div className="mb-6">
+                  <h3 className="text-sm font-semibold text-foreground mb-2">Facebook App ID</h3>
+                  <div className="p-3 rounded-lg bg-muted/50 border border-border font-mono text-xs">
+                    {oauthConfig.facebook.appId || '(não configurado)'}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Verifique se este ID corresponde ao seu app em developers.facebook.com
+                  </p>
+                </div>
+
+                {/* SDK Status */}
+                <div className="mb-6">
+                  <h3 className="text-sm font-semibold text-foreground mb-2">Status do Facebook SDK</h3>
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
+                    <span className={`w-3 h-3 rounded-full ${fbReady ? 'bg-green-500' : fbConfigured ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`} />
+                    <span className="text-sm text-foreground">
+                      {fbReady ? 'SDK carregado e pronto' : fbConfigured ? 'SDK carregando...' : 'SDK não configurado'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Environment Info */}
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground mb-2">Ambiente</h3>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between p-2 rounded bg-muted/30">
+                      <span className="text-muted-foreground">Embedded (iframe):</span>
+                      <span className="font-mono">{isEmbedded ? 'Sim' : 'Não'}</span>
+                    </div>
+                    <div className="flex justify-between p-2 rounded bg-muted/30">
+                      <span className="text-muted-foreground">User ID:</span>
+                      <span className="font-mono">{user?.id || '(não autenticado)'}</span>
+                    </div>
+                    <div className="flex justify-between p-2 rounded bg-muted/30">
+                      <span className="text-muted-foreground">Supabase URL:</span>
+                      <span className="font-mono truncate max-w-[200px]">{import.meta.env.VITE_SUPABASE_URL || '(não configurado)'}</span>
+                    </div>
                   </div>
                 </div>
               </div>
