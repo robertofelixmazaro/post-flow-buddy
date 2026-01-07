@@ -5,21 +5,21 @@
 export const oauthConfig = {
   facebook: {
     // Facebook App ID - get from https://developers.facebook.com/apps/
-    appId: import.meta.env.VITE_FACEBOOK_APP_ID || '681638807610238',
+    appId: import.meta.env.VITE_FACEBOOK_APP_ID || '',
     version: 'v18.0',
   },
   instagram: {
     // Instagram uses Facebook's OAuth - same app ID
-    appId: import.meta.env.VITE_FACEBOOK_APP_ID || '681638807610238',
+    appId: import.meta.env.VITE_FACEBOOK_APP_ID || '',
     version: 'v18.0',
   },
   tiktok: {
     // TikTok Client Key - get from https://developers.tiktok.com/
-    clientKey: import.meta.env.VITE_TIKTOK_CLIENT_KEY || '',
+    clientKey: import.meta.env.VITE_TIKTOK_CLIENT_KEY || 'aw8w56r0vkvd1g2d',
   },
   linkedin: {
     // LinkedIn Client ID - get from https://www.linkedin.com/developers/
-    clientId: import.meta.env.VITE_LINKEDIN_CLIENT_ID || '',
+    clientId: import.meta.env.VITE_LINKEDIN_CLIENT_ID || '77vd6ydvofvdur',
   },
 };
 
