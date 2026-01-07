@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { bestTimes, getNetworkName } from '@/data/mockData';
 import { NetworkBadge } from '@/components/ui/NetworkBadge';
 import { useSocialConnections, useDisconnectSocial, getOAuthUrl, isOAuthConfigured } from '@/hooks/useSocialConnections';
+import { useFacebookSDK } from '@/hooks/useFacebookSDK';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -20,7 +21,8 @@ import {
   Check,
   ExternalLink,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  Facebook
 } from 'lucide-react';
 import {
   Dialog,
@@ -58,6 +60,7 @@ export default function Settings() {
   const [searchParams] = useSearchParams();
   const { data: connections, isLoading: loadingConnections } = useSocialConnections();
   const disconnectSocial = useDisconnectSocial();
+  const { isReady: fbReady, isLoading: fbLoading, loginWithFacebook, isConfigured: fbConfigured } = useFacebookSDK();
   
   const [activeSection, setActiveSection] = useState('profile');
   const [notifications, setNotifications] = useState({
@@ -98,12 +101,41 @@ export default function Settings() {
   };
 
   const handleConnect = (network: string) => {
-    setSelectedNetworkForOAuth(network);
-    setOauthInfoOpen(true);
+    // For Facebook and Instagram, use SDK directly if available
+    if ((network === 'facebook' || network === 'instagram') && fbConfigured && fbReady) {
+      handleFacebookSDKLogin(network as 'facebook' | 'instagram');
+    } else {
+      setSelectedNetworkForOAuth(network);
+      setOauthInfoOpen(true);
+    }
+  };
+
+  const handleFacebookSDKLogin = async (type: 'facebook' | 'instagram') => {
+    const result = await loginWithFacebook(type);
+    
+    if (result.success) {
+      toast({
+        title: "Rede conectada!",
+        description: `${getNetworkName(type)} foi conectado com sucesso.`,
+      });
+    } else {
+      toast({
+        title: "Erro na conexão",
+        description: result.error || "Não foi possível conectar a conta.",
+        variant: "destructive"
+      });
+    }
   };
 
   const startOAuth = () => {
     if (selectedNetworkForOAuth) {
+      // For Facebook/Instagram, try SDK first
+      if ((selectedNetworkForOAuth === 'facebook' || selectedNetworkForOAuth === 'instagram') && fbConfigured && fbReady) {
+        setOauthInfoOpen(false);
+        handleFacebookSDKLogin(selectedNetworkForOAuth as 'facebook' | 'instagram');
+        return;
+      }
+
       // Check if OAuth is configured for this network
       if (!isOAuthConfigured(selectedNetworkForOAuth as any)) {
         toast({
@@ -314,8 +346,15 @@ export default function Settings() {
                                 size="sm" 
                                 className="gap-2"
                                 onClick={() => handleConnect(network.id)}
+                                disabled={(network.id === 'facebook' || network.id === 'instagram') && fbLoading}
                               >
-                                <ExternalLink className="w-4 h-4" />
+                                {(network.id === 'facebook' || network.id === 'instagram') && fbLoading ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (network.id === 'facebook' || network.id === 'instagram') && fbConfigured ? (
+                                  <Facebook className="w-4 h-4" />
+                                ) : (
+                                  <ExternalLink className="w-4 h-4" />
+                                )}
                                 Conectar
                               </Button>
                             )}
