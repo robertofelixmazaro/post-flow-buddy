@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { bestTimes, getNetworkName } from '@/data/mockData';
 import { NetworkBadge } from '@/components/ui/NetworkBadge';
-import { useSocialConnections, useDisconnectSocial, getOAuthUrl } from '@/hooks/useSocialConnections';
+import { useSocialConnections, useDisconnectSocial, getOAuthUrl, isOAuthConfigured } from '@/hooks/useSocialConnections';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -104,17 +104,30 @@ export default function Settings() {
 
   const startOAuth = () => {
     if (selectedNetworkForOAuth) {
-      // In production, this would redirect to the OAuth URL
-      // For now, show a message about configuration needed
-      toast({
-        title: "Configuração necessária",
-        description: "Para conectar redes sociais, configure as credenciais OAuth nas configurações do projeto.",
-        variant: "destructive"
-      });
-      setOauthInfoOpen(false);
+      // Check if OAuth is configured for this network
+      if (!isOAuthConfigured(selectedNetworkForOAuth as any)) {
+        toast({
+          title: "OAuth não configurado",
+          description: `Configure as credenciais OAuth para ${getNetworkName(selectedNetworkForOAuth as any)} nas variáveis de ambiente.`,
+          variant: "destructive"
+        });
+        setOauthInfoOpen(false);
+        return;
+      }
       
-      // Uncomment when OAuth is configured:
-      // window.location.href = getOAuthUrl(selectedNetworkForOAuth);
+      const oauthUrl = getOAuthUrl(selectedNetworkForOAuth as any, user?.id);
+      
+      if (oauthUrl) {
+        // Redirect to OAuth provider
+        window.location.href = oauthUrl;
+      } else {
+        toast({
+          title: "Erro",
+          description: "Não foi possível iniciar o processo de autenticação.",
+          variant: "destructive"
+        });
+        setOauthInfoOpen(false);
+      }
     }
   };
 
@@ -212,14 +225,37 @@ export default function Settings() {
               <div className="bg-card rounded-2xl border border-border p-6">
                 <h2 className="text-lg font-semibold text-foreground mb-4">Redes Sociais</h2>
                 
-                <Alert className="mb-4 border-primary/30 bg-primary/5">
-                  <AlertTriangle className="h-4 w-4 text-primary" />
-                  <AlertTitle className="text-primary">Configuração OAuth Necessária</AlertTitle>
-                  <AlertDescription className="text-muted-foreground">
-                    Para conectar redes sociais, você precisa configurar os Apps OAuth de cada plataforma 
-                    (Meta Developer, Twitter Developer, LinkedIn Developer) e adicionar as credenciais como secrets.
-                  </AlertDescription>
-                </Alert>
+                {/* Show configured networks status */}
+                {(() => {
+                  const configuredNetworks = availableNetworks.filter(n => isOAuthConfigured(n.id as any));
+                  const unconfiguredNetworks = availableNetworks.filter(n => !isOAuthConfigured(n.id as any));
+                  
+                  if (unconfiguredNetworks.length > 0) {
+                    return (
+                      <Alert className="mb-4 border-amber-500/30 bg-amber-500/5">
+                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                        <AlertTitle className="text-amber-600">Algumas redes não configuradas</AlertTitle>
+                        <AlertDescription className="text-muted-foreground">
+                          {unconfiguredNetworks.map(n => n.name).join(', ')} precisam de configuração OAuth.
+                          {configuredNetworks.length > 0 && (
+                            <span className="block mt-1 text-green-600">
+                              ✓ Configuradas: {configuredNetworks.map(n => n.name).join(', ')}
+                            </span>
+                          )}
+                        </AlertDescription>
+                      </Alert>
+                    );
+                  }
+                  return (
+                    <Alert className="mb-4 border-green-500/30 bg-green-500/5">
+                      <Check className="h-4 w-4 text-green-500" />
+                      <AlertTitle className="text-green-600">OAuth Configurado</AlertTitle>
+                      <AlertDescription className="text-muted-foreground">
+                        Todas as redes estão prontas para conexão.
+                      </AlertDescription>
+                    </Alert>
+                  );
+                })()}
                 
                 <p className="text-sm text-muted-foreground mb-4">
                   Conecte suas contas para agendar publicações
