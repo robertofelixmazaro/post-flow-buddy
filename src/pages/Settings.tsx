@@ -83,6 +83,14 @@ export default function Settings() {
   const [selectedNetworkForOAuth, setSelectedNetworkForOAuth] = useState<string | null>(null);
   const [selectingPage, setSelectingPage] = useState(false);
 
+  const isEmbedded = (() => {
+    try {
+      return window.self !== window.top;
+    } catch {
+      return true;
+    }
+  })();
+
   // Check for OAuth callback results
   useEffect(() => {
     const connected = searchParams.get('connected');
@@ -111,13 +119,6 @@ export default function Settings() {
 
   const handleConnect = (network: string) => {
     const isFacebookNetwork = network === 'facebook' || network === 'instagram';
-    const isEmbedded = (() => {
-      try {
-        return window.self !== window.top;
-      } catch {
-        return true;
-      }
-    })();
 
     // Em ambiente incorporado (iframe), o FB.login pode não finalizar (popup/cookies). Nesse caso, use OAuth.
     if (isFacebookNetwork && !isEmbedded && fbConfigured && fbReady) {
@@ -172,13 +173,6 @@ export default function Settings() {
   const startOAuth = () => {
     if (selectedNetworkForOAuth) {
       const isFacebookNetwork = selectedNetworkForOAuth === 'facebook' || selectedNetworkForOAuth === 'instagram';
-      const isEmbedded = (() => {
-        try {
-          return window.self !== window.top;
-        } catch {
-          return true;
-        }
-      })();
 
       // For Facebook/Instagram, try SDK only when NOT embedded
       if (isFacebookNetwork && !isEmbedded && fbConfigured && fbReady) {
@@ -342,22 +336,33 @@ export default function Settings() {
                           )}
                         </AlertDescription>
                       </Alert>
-                    );
-                  }
-                  return (
-                    <Alert className="mb-4 border-green-500/30 bg-green-500/5">
-                      <Check className="h-4 w-4 text-green-500" />
-                      <AlertTitle className="text-green-600">OAuth Configurado</AlertTitle>
-                      <AlertDescription className="text-muted-foreground">
-                        Todas as redes estão prontas para conexão.
-                      </AlertDescription>
-                    </Alert>
-                  );
-                })()}
-                
-                <p className="text-sm text-muted-foreground mb-4">
-                  Conecte suas contas para agendar publicações
-                </p>
+                      );
+                   }
+                   return (
+                     <Alert className="mb-4 border-green-500/30 bg-green-500/5">
+                       <Check className="h-4 w-4 text-green-500" />
+                       <AlertTitle className="text-green-600">OAuth Configurado</AlertTitle>
+                       <AlertDescription className="text-muted-foreground">
+                         Todas as redes estão prontas para conexão.
+                       </AlertDescription>
+                     </Alert>
+                   );
+                 })()}
+
+                 {isEmbedded && (
+                   <Alert className="mb-4 border-primary/20 bg-primary/5">
+                     <ExternalLink className="h-4 w-4 text-primary" />
+                     <AlertTitle>Login abrirá em nova aba</AlertTitle>
+                     <AlertDescription className="text-muted-foreground">
+                       Você está usando a prévia incorporada. Ao conectar Facebook/Instagram, o login será aberto em uma nova aba.
+                       Se nada acontecer, permita pop-ups para este site.
+                     </AlertDescription>
+                   </Alert>
+                 )}
+                 
+                 <p className="text-sm text-muted-foreground mb-4">
+                   Conecte suas contas para agendar publicações
+                 </p>
                 
                 {loadingConnections ? (
                   <div className="flex items-center justify-center py-8">
@@ -563,6 +568,12 @@ export default function Settings() {
             <DialogTitle>Conectar {selectedNetworkForOAuth && getNetworkName(selectedNetworkForOAuth as any)}</DialogTitle>
             <DialogDescription>
               Você será redirecionado para autorizar o acesso à sua conta.
+              {isEmbedded &&
+                (selectedNetworkForOAuth === 'facebook' || selectedNetworkForOAuth === 'instagram') && (
+                  <span className="block mt-2">
+                    Em prévia incorporada, o login abrirá em uma nova aba. Se não abrir, permita pop-ups para este site.
+                  </span>
+                )}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
