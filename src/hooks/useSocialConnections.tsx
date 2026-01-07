@@ -52,32 +52,56 @@ export function useDisconnectSocial() {
   });
 }
 
+// Helper to get OAuth client ID with validation
+function getOAuthClientId(network: NetworkType): string | null {
+  switch (network) {
+    case 'facebook':
+    case 'instagram':
+      return import.meta.env.VITE_FACEBOOK_APP_ID || null;
+    case 'tiktok':
+      return import.meta.env.VITE_TIKTOK_CLIENT_KEY || null;
+    case 'linkedin':
+      return import.meta.env.VITE_LINKEDIN_CLIENT_ID || null;
+    default:
+      return null;
+  }
+}
+
+// Check if OAuth is configured for a network
+export function isOAuthConfigured(network: NetworkType): boolean {
+  return !!getOAuthClientId(network);
+}
+
 // OAuth URLs for each platform
-export function getOAuthUrl(network: NetworkType, userId?: string): string {
+export function getOAuthUrl(network: NetworkType, userId?: string): string | null {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
+  
+  const clientId = getOAuthClientId(network);
+  
+  // Return null if OAuth is not configured - caller should handle this
+  if (!clientId) {
+    console.warn(`OAuth not configured for ${network}. Please set the required environment variable.`);
+    return null;
+  }
   
   // Encode state with network and user info
   const state = btoa(JSON.stringify({ network, userId }));
   
   switch (network) {
     case 'facebook':
-      // Meta OAuth - App ID will be used by the edge function
-      return `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_FACEBOOK_APP_ID || 'CONFIGURE_APP_ID'}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=pages_manage_posts,pages_read_engagement,pages_show_list&state=${state}`;
+      return `https://www.facebook.com/v18.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=pages_manage_posts,pages_read_engagement,pages_show_list&state=${state}`;
     
     case 'instagram':
-      // Instagram uses Facebook OAuth with instagram permissions
-      return `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_FACEBOOK_APP_ID || 'CONFIGURE_APP_ID'}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=instagram_basic,instagram_content_publish,pages_show_list,business_management&state=${state}`;
+      return `https://www.facebook.com/v18.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=instagram_basic,instagram_content_publish,pages_show_list,business_management&state=${state}`;
     
     case 'tiktok':
-      // TikTok OAuth
-      return `https://www.tiktok.com/v2/auth/authorize?client_key=${import.meta.env.VITE_TIKTOK_CLIENT_KEY || 'CONFIGURE_CLIENT_KEY'}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=user.info.basic,video.publish&state=${state}`;
+      return `https://www.tiktok.com/v2/auth/authorize?client_key=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=user.info.basic,video.publish&state=${state}`;
     
     case 'linkedin':
-      // LinkedIn OAuth with OpenID Connect
-      return `https://www.linkedin.com/oauth/v2/authorization?client_id=${import.meta.env.VITE_LINKEDIN_CLIENT_ID || 'CONFIGURE_CLIENT_ID'}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20profile%20w_member_social&state=${state}`;
+      return `https://www.linkedin.com/oauth/v2/authorization?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20profile%20w_member_social&state=${state}`;
     
     default:
-      return '#';
+      return null;
   }
 }
