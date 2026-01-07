@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
   }
 
   const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://lovable.dev';
-  const settingsPath = '/settings';
+  const settingsPath = '/configuracoes';
 
   try {
     // Only accept GET requests for OAuth callbacks

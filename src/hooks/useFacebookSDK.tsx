@@ -107,9 +107,20 @@ export function useFacebookSDK() {
   }, [appId]);
 
   const loginWithFacebook = useCallback(async (type: 'facebook' | 'instagram' = 'facebook') => {
-    if (!window.FB || !isReady) {
-      setError('Facebook SDK não está pronto');
-      return { success: false, error: 'SDK not ready' };
+    console.log('loginWithFacebook called:', { type, isReady, fbExists: !!window.FB, appId });
+    
+    if (!window.FB) {
+      const errorMsg = 'Facebook SDK não foi carregado. Recarregue a página.';
+      setError(errorMsg);
+      console.error('FB SDK not loaded');
+      return { success: false, error: errorMsg };
+    }
+
+    if (!isReady) {
+      const errorMsg = 'Facebook SDK ainda está inicializando. Aguarde um momento.';
+      setError(errorMsg);
+      console.error('FB SDK not ready');
+      return { success: false, error: errorMsg };
     }
 
     if (!user) {
@@ -123,6 +134,8 @@ export function useFacebookSDK() {
     const scope = type === 'instagram'
       ? 'instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement,business_management'
       : 'pages_manage_posts,pages_read_engagement,pages_show_list,public_profile';
+    
+    console.log('Requesting FB login with scope:', scope);
 
     return new Promise<{ success: boolean; error?: string; needsPageSelection?: boolean }>((resolve) => {
       window.FB.login(
@@ -279,17 +292,25 @@ export function useFacebookSDK() {
   }) => {
     if (!user) throw new Error('User not authenticated');
 
-    // Simple XOR encryption (same as oauth-callback)
+    // Use same encryption key as oauth-callback for consistency
     const encryptToken = (token: string): string => {
-      const key = 'lovable-social-key';
+      // Use SUPABASE_PUBLISHABLE_KEY as shared key (available in both frontend and backend)
+      const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'lovable-social-key';
+      const paddedKey = key.padEnd(32, '0').slice(0, 32);
       let result = '';
       for (let i = 0; i < token.length; i++) {
-        result += String.fromCharCode(token.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+        result += String.fromCharCode(token.charCodeAt(i) ^ paddedKey.charCodeAt(i % paddedKey.length));
       }
       return btoa(result);
     };
 
     const tokenExpiresAt = new Date(Date.now() + data.expiresIn * 1000).toISOString();
+
+    console.log('Saving social connection:', { 
+      network: data.network, 
+      accountId: data.accountId,
+      pageId: data.pageId 
+    });
 
     const { error: dbError } = await supabase
       .from('social_connections')
@@ -306,13 +327,15 @@ export function useFacebookSDK() {
         connected_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }, {
-        onConflict: 'user_id,network'
+        onConflict: 'user_id,network,account_id'
       });
 
     if (dbError) {
+      console.error('Error saving connection:', dbError);
       throw new Error(`Erro ao salvar conexão: ${dbError.message}`);
     }
 
+    console.log('Social connection saved successfully');
     // Invalidate queries to refresh the connections list
     queryClient.invalidateQueries({ queryKey: ['social-connections'] });
   };
