@@ -110,8 +110,17 @@ export default function Settings() {
   };
 
   const handleConnect = (network: string) => {
-    // For Facebook and Instagram, use SDK directly if available
-    if ((network === 'facebook' || network === 'instagram') && fbConfigured && fbReady) {
+    const isFacebookNetwork = network === 'facebook' || network === 'instagram';
+    const isEmbedded = (() => {
+      try {
+        return window.self !== window.top;
+      } catch {
+        return true;
+      }
+    })();
+
+    // Em ambiente incorporado (iframe), o FB.login pode não finalizar (popup/cookies). Nesse caso, use OAuth.
+    if (isFacebookNetwork && !isEmbedded && fbConfigured && fbReady) {
       handleFacebookSDKLogin(network as 'facebook' | 'instagram');
     } else {
       setSelectedNetworkForOAuth(network);
@@ -162,8 +171,17 @@ export default function Settings() {
 
   const startOAuth = () => {
     if (selectedNetworkForOAuth) {
-      // For Facebook/Instagram, try SDK first
-      if ((selectedNetworkForOAuth === 'facebook' || selectedNetworkForOAuth === 'instagram') && fbConfigured && fbReady) {
+      const isFacebookNetwork = selectedNetworkForOAuth === 'facebook' || selectedNetworkForOAuth === 'instagram';
+      const isEmbedded = (() => {
+        try {
+          return window.self !== window.top;
+        } catch {
+          return true;
+        }
+      })();
+
+      // For Facebook/Instagram, try SDK only when NOT embedded
+      if (isFacebookNetwork && !isEmbedded && fbConfigured && fbReady) {
         setOauthInfoOpen(false);
         handleFacebookSDKLogin(selectedNetworkForOAuth as 'facebook' | 'instagram');
         return;
@@ -183,8 +201,23 @@ export default function Settings() {
       const oauthUrl = getOAuthUrl(selectedNetworkForOAuth as any, user?.id);
       
       if (oauthUrl) {
-        // Redirect to OAuth provider
-        window.location.href = oauthUrl;
+        setOauthInfoOpen(false);
+
+        // Em iframe, muitas páginas de login (incluindo Facebook) bloqueiam renderização.
+        // Tentamos navegar no topo; se não for possível, abrimos em nova aba.
+        try {
+          if (window.self !== window.top) {
+            window.top!.location.href = oauthUrl;
+            return;
+          }
+        } catch {
+          // ignore
+        }
+
+        const opened = window.open(oauthUrl, '_blank', 'noopener,noreferrer');
+        if (!opened) {
+          window.location.href = oauthUrl;
+        }
       } else {
         toast({
           title: "Erro",

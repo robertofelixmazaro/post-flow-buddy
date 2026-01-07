@@ -88,6 +88,20 @@ export function useFacebookSDK() {
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
     const markReady = () => {
+      if (!window.FB) return;
+
+      // Ensure the SDK is initialized (safe to call; FB will no-op if already initialized)
+      try {
+        window.FB.init({
+          appId,
+          cookie: true,
+          xfbml: true,
+          version: 'v18.0',
+        });
+      } catch {
+        // ignore - sometimes FB is already initialized and can throw depending on load timing
+      }
+
       console.log('Facebook SDK is ready');
       setIsReady(true);
       if (intervalId) {
@@ -140,19 +154,15 @@ export function useFacebookSDK() {
   }, [appId]);
 
   const loginWithFacebook = useCallback(async (type: 'facebook' | 'instagram' = 'facebook') => {
-    console.log('loginWithFacebook called:', { type, isReady, fbExists: !!window.FB, appId });
-    
     if (!window.FB) {
       const errorMsg = 'Facebook SDK não foi carregado. Recarregue a página.';
       setError(errorMsg);
-      console.error('FB SDK not loaded');
       return { success: false, error: errorMsg };
     }
 
     if (!isReady) {
       const errorMsg = 'Facebook SDK ainda está inicializando. Aguarde um momento.';
       setError(errorMsg);
-      console.error('FB SDK not ready');
       return { success: false, error: errorMsg };
     }
 
@@ -164,31 +174,58 @@ export function useFacebookSDK() {
     setIsLoading(true);
     setError(null);
 
-    const scope = type === 'instagram'
-      ? 'instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement,business_management'
-      : 'pages_manage_posts,pages_read_engagement,pages_show_list,public_profile';
-    
-    console.log('Requesting FB login with scope:', scope);
+    const scope =
+      type === 'instagram'
+        ? 'instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement,business_management'
+        : 'pages_manage_posts,pages_read_engagement,pages_show_list,public_profile';
 
+    // FB.login às vezes não chama o callback (popup bloqueado/iframe). Evitamos "spinner infinito" com timeout.
     return new Promise<{ success: boolean; error?: string; needsPageSelection?: boolean }>((resolve) => {
-      window.FB.login(
-        async (response) => {
-          if (response.status === 'connected' && response.authResponse) {
-            try {
-              const result = await fetchPagesForSelection(response.authResponse, type);
-              resolve(result);
-            } catch (err: any) {
-              setError(err.message);
-              resolve({ success: false, error: err.message });
+      let finished = false;
+
+      const finish = (result: { success: boolean; error?: string; needsPageSelection?: boolean }) => {
+        if (finished) return;
+        finished = true;
+        setIsLoading(false);
+        resolve(result);
+      };
+
+      const timeoutId = window.setTimeout(() => {
+        const msg =
+          'Não foi possível abrir o login do Facebook/Instagram (popup bloqueado ou ambiente incorporado).';
+        setError(msg);
+        finish({ success: false, error: msg });
+      }, 30000);
+
+      try {
+        window.FB.login(
+          async (response) => {
+            window.clearTimeout(timeoutId);
+
+            if (response.status === 'connected' && response.authResponse) {
+              try {
+                const result = await fetchPagesForSelection(response.authResponse, type);
+                finish(result);
+              } catch (err: any) {
+                const msg = err?.message || 'Erro ao buscar páginas';
+                setError(msg);
+                finish({ success: false, error: msg });
+              }
+              return;
             }
-          } else {
-            setError('Login cancelado ou não autorizado');
-            resolve({ success: false, error: 'Login cancelled' });
-          }
-          setIsLoading(false);
-        },
-        { scope, return_scopes: true }
-      );
+
+            const msg = 'Login cancelado ou não autorizado';
+            setError(msg);
+            finish({ success: false, error: msg });
+          },
+          { scope, return_scopes: true }
+        );
+      } catch (err: any) {
+        window.clearTimeout(timeoutId);
+        const msg = err?.message || 'Erro ao iniciar login do Facebook';
+        setError(msg);
+        finish({ success: false, error: msg });
+      }
     });
   }, [isReady, user]);
 
