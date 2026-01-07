@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Zap, Mail, Lock, User, Loader2, Phone, MapPin, Building2, Users, UserCircle } from 'lucide-react';
+import { Zap, Mail, Lock, User, Loader2, Phone, MapPin, Building2, Users, UserCircle, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
@@ -136,6 +136,7 @@ export default function Auth() {
   const [city, setCity] = useState('');
   const [usageType, setUsageType] = useState<UsageType>('personal');
   const [errors, setErrors] = useState<FormErrors>({});
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -504,13 +505,21 @@ export default function Auth() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 bg-muted/30 border-border"
+                  className="pl-10 pr-10 bg-muted/30 border-border"
                   aria-label="Senha"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
               {errors.password && (
                 <p className="text-sm text-destructive mt-1">{errors.password}</p>
