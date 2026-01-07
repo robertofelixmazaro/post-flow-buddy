@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { NetworkType } from '@/data/mockData';
+import { oauthConfig, isNetworkConfigured, getOAuthRedirectUri } from '@/config/oauth';
 
 export interface SocialConnection {
   id: string;
@@ -52,36 +53,18 @@ export function useDisconnectSocial() {
   });
 }
 
-// Helper to get OAuth client ID with validation
-function getOAuthClientId(network: NetworkType): string | null {
-  switch (network) {
-    case 'facebook':
-    case 'instagram':
-      return import.meta.env.VITE_FACEBOOK_APP_ID || null;
-    case 'tiktok':
-      return import.meta.env.VITE_TIKTOK_CLIENT_KEY || null;
-    case 'linkedin':
-      return import.meta.env.VITE_LINKEDIN_CLIENT_ID || null;
-    default:
-      return null;
-  }
-}
-
-// Check if OAuth is configured for a network
+// Check if OAuth is configured for a network - uses centralized config
 export function isOAuthConfigured(network: NetworkType): boolean {
-  return !!getOAuthClientId(network);
+  return isNetworkConfigured(network as any);
 }
 
-// OAuth URLs for each platform
+// OAuth URLs for each platform - uses centralized config
 export function getOAuthUrl(network: NetworkType, userId?: string): string | null {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
+  const redirectUri = getOAuthRedirectUri();
   
-  const clientId = getOAuthClientId(network);
-  
-  // Return null if OAuth is not configured - caller should handle this
-  if (!clientId) {
-    console.warn(`OAuth not configured for ${network}. Please set the required environment variable.`);
+  // Return null if OAuth is not configured
+  if (!isOAuthConfigured(network)) {
+    console.warn(`OAuth not configured for ${network}.`);
     return null;
   }
   
@@ -90,16 +73,16 @@ export function getOAuthUrl(network: NetworkType, userId?: string): string | nul
   
   switch (network) {
     case 'facebook':
-      return `https://www.facebook.com/v18.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=pages_manage_posts,pages_read_engagement,pages_show_list&state=${state}`;
+      return `https://www.facebook.com/${oauthConfig.facebook.version}/dialog/oauth?client_id=${oauthConfig.facebook.appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=pages_manage_posts,pages_read_engagement,pages_show_list&state=${state}`;
     
     case 'instagram':
-      return `https://www.facebook.com/v18.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=instagram_basic,instagram_content_publish,pages_show_list,business_management&state=${state}`;
+      return `https://www.facebook.com/${oauthConfig.instagram.version}/dialog/oauth?client_id=${oauthConfig.instagram.appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=instagram_basic,instagram_content_publish,pages_show_list,business_management&state=${state}`;
     
     case 'tiktok':
-      return `https://www.tiktok.com/v2/auth/authorize?client_key=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=user.info.basic,video.publish&state=${state}`;
+      return `https://www.tiktok.com/v2/auth/authorize?client_key=${oauthConfig.tiktok.clientKey}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=user.info.basic,video.publish&state=${state}`;
     
     case 'linkedin':
-      return `https://www.linkedin.com/oauth/v2/authorization?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20profile%20w_member_social&state=${state}`;
+      return `https://www.linkedin.com/oauth/v2/authorization?client_id=${oauthConfig.linkedin.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20profile%20w_member_social&state=${state}`;
     
     default:
       return null;

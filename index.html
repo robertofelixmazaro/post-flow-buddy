@@ -21,15 +21,19 @@
   <body>
     <div id="fb-root"></div>
     <script>
+      // Facebook App ID - this is a PUBLIC value, safe to include here
+      window.__FB_APP_ID__ = '681638807610238';
+      
       window.fbAsyncInit = function() {
-        if (window.FB) {
+        if (window.FB && window.__FB_APP_ID__) {
           FB.init({
-            appId: window.__FB_APP_ID__ || '',
+            appId: window.__FB_APP_ID__,
             cookie: true,
             xfbml: true,
             version: 'v18.0'
           });
           FB.AppEvents.logPageView();
+          console.log('Facebook SDK initialized with App ID:', window.__FB_APP_ID__);
           window.dispatchEvent(new Event('fb-sdk-ready'));
         }
       };
