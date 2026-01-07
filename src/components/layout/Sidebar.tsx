@@ -11,7 +11,8 @@ import {
   Zap,
   ClipboardList,
   LogOut,
-  UserCircle
+  UserCircle,
+  FileText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ const navItems = [
   { icon: Calendar, label: 'Calendário', path: '/' },
   { icon: PenSquare, label: 'Criar Post', path: '/criar' },
   { icon: ClipboardList, label: 'Agendamentos', path: '/agendamentos' },
+  { icon: FileText, label: 'Logs', path: '/logs' },
   { icon: Image, label: 'Biblioteca', path: '/biblioteca' },
   { icon: BarChart3, label: 'Analytics', path: '/analytics' },
   { icon: UserCircle, label: 'Meu Perfil', path: '/perfil' },
