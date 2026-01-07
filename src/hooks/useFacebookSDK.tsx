@@ -199,24 +199,27 @@ export function useFacebookSDK() {
 
       try {
         window.FB.login(
-          async (response) => {
-            window.clearTimeout(timeoutId);
+          (response) => {
+            // Mantém o callback como função "normal" (não-async) para evitar erros do SDK.
+            void (async () => {
+              window.clearTimeout(timeoutId);
 
-            if (response.status === 'connected' && response.authResponse) {
-              try {
-                const result = await fetchPagesForSelection(response.authResponse, type);
-                finish(result);
-              } catch (err: any) {
-                const msg = err?.message || 'Erro ao buscar páginas';
-                setError(msg);
-                finish({ success: false, error: msg });
+              if (response.status === 'connected' && response.authResponse) {
+                try {
+                  const result = await fetchPagesForSelection(response.authResponse, type);
+                  finish(result);
+                } catch (err: any) {
+                  const msg = err?.message || 'Erro ao buscar páginas';
+                  setError(msg);
+                  finish({ success: false, error: msg });
+                }
+                return;
               }
-              return;
-            }
 
-            const msg = 'Login cancelado ou não autorizado';
-            setError(msg);
-            finish({ success: false, error: msg });
+              const msg = 'Login cancelado ou não autorizado';
+              setError(msg);
+              finish({ success: false, error: msg });
+            })();
           },
           { scope, return_scopes: true }
         );
