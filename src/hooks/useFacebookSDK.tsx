@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useQueryClient } from '@tanstack/react-query';
+import { oauthConfig } from '@/config/oauth';
 
 declare global {
   interface Window {
@@ -72,7 +73,8 @@ export function useFacebookSDK() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const appId = import.meta.env.VITE_FACEBOOK_APP_ID;
+  // Use centralized OAuth config
+  const appId = oauthConfig.facebook.appId;
 
   useEffect(() => {
     if (!appId) {
