@@ -7,11 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { bestTimes, getNetworkName } from '@/data/mockData';
 import { NetworkBadge } from '@/components/ui/NetworkBadge';
-import { useSocialConnections, useDisconnectSocial, getOAuthUrl, isOAuthConfigured } from '@/hooks/useSocialConnections';
+import { useSocialConnections, useDisconnectSocial, useOAuthConfig, requestOAuthUrl } from '@/hooks/useSocialConnections';
 import { useFacebookSDK } from '@/hooks/useFacebookSDK';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { oauthConfig, getOAuthRedirectUri } from '@/config/oauth';
 import { 
   User, 
   Bell, 
@@ -63,6 +62,8 @@ export default function Settings() {
   const [searchParams] = useSearchParams();
   const { data: connections, isLoading: loadingConnections } = useSocialConnections();
   const disconnectSocial = useDisconnectSocial();
+  const { data: oauthCfg } = useOAuthConfig();
+  const isOAuthConfigured = (network: string) => !!oauthCfg?.configured?.[network];
   const { 
     isReady: fbReady, 
     isLoading: fbLoading, 
@@ -173,7 +174,7 @@ export default function Settings() {
     }
   };
 
-  const startOAuth = () => {
+  const startOAuth = async () => {
     if (selectedNetworkForOAuth) {
       const isFacebookNetwork = selectedNetworkForOAuth === 'facebook' || selectedNetworkForOAuth === 'instagram';
 
@@ -195,7 +196,7 @@ export default function Settings() {
         return;
       }
       
-      const oauthUrl = getOAuthUrl(selectedNetworkForOAuth as any, user?.id);
+      const { url: oauthUrl, error: oauthError } = await requestOAuthUrl(selectedNetworkForOAuth as any);
       
       if (oauthUrl) {
         setOauthInfoOpen(false);
@@ -218,7 +219,7 @@ export default function Settings() {
       } else {
         toast({
           title: "Erro",
-          description: "Não foi possível iniciar o processo de autenticação.",
+          description: oauthError || "Não foi possível iniciar o processo de autenticação.",
           variant: "destructive"
         });
         setOauthInfoOpen(false);
@@ -576,7 +577,7 @@ export default function Settings() {
                 <div className="mb-6">
                   <h3 className="text-sm font-semibold text-foreground mb-2">Redirect URI (Callback)</h3>
                   <div className="p-3 rounded-lg bg-muted/50 border border-border font-mono text-xs break-all">
-                    {getOAuthRedirectUri()}
+                    {oauthCfg?.redirectUri || '(carregando...)'}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     Configure esta URL no painel do Facebook/TikTok/LinkedIn como "Valid OAuth Redirect URIs".
@@ -608,7 +609,7 @@ export default function Settings() {
                 <div className="mb-6">
                   <h3 className="text-sm font-semibold text-foreground mb-2">Facebook App ID</h3>
                   <div className="p-3 rounded-lg bg-muted/50 border border-border font-mono text-xs">
-                    {oauthConfig.facebook.appId || '(não configurado)'}
+                    {oauthCfg?.facebookAppId || '(não configurado)'}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     Verifique se este ID corresponde ao seu app em developers.facebook.com
@@ -667,7 +668,7 @@ export default function Settings() {
           </DialogHeader>
           <div className="py-4">
             <p className="text-sm text-muted-foreground mb-4">
-              Ao conectar sua conta, você autoriza o Agendasaas a:
+              Ao conectar sua conta, você autoriza o Agenda Plus a:
             </p>
             <ul className="text-sm text-muted-foreground space-y-2">
               <li className="flex items-center gap-2">
@@ -693,8 +694,12 @@ export default function Settings() {
                 variant="outline"
                 size="sm"
                 className="gap-2 shrink-0"
-                onClick={() => {
-                  const url = getOAuthUrl(selectedNetworkForOAuth as any, user?.id);
+                onClick={async () => {
+                  const res = await requestOAuthUrl(selectedNetworkForOAuth as any);
+                  const url = res.url;
+                  if (!url) {
+                    toast({ title: "Erro", description: res.error, variant: "destructive" });
+                  }
                   if (url) {
                     navigator.clipboard.writeText(url);
                     toast({
