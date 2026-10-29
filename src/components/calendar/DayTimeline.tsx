@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { scheduledPosts, ScheduledPost } from '@/data/mockData';
+import { useCalendarPosts } from '@/hooks/useScheduledPosts';
 import { PostCard } from './PostCard';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', '
 
 export function DayTimeline() {
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const { posts: scheduledPosts } = useCalendarPosts();
 
   const todaysPosts = useMemo(() => {
     return scheduledPosts
@@ -18,7 +19,7 @@ export function DayTimeline() {
         return postDate.toDateString() === selectedDate.toDateString();
       })
       .sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
-  }, [selectedDate]);
+  }, [selectedDate, scheduledPosts]);
 
   const navigateDay = (direction: number) => {
     setSelectedDate(prev => {

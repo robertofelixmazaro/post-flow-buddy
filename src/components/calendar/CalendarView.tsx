@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { scheduledPosts, ScheduledPost, NetworkType } from '@/data/mockData';
+import { ScheduledPost } from '@/data/mockData';
+import { useCalendarPosts } from '@/hooks/useScheduledPosts';
 import { NetworkBadge } from '@/components/ui/NetworkBadge';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate } from 'react-router-dom';
@@ -22,6 +23,7 @@ interface CalendarDay {
 export function CalendarView() {
   const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
+  const { posts: scheduledPosts } = useCalendarPosts();
 
   const handleDayClick = (date: Date) => {
     const dateStr = date.toISOString().split('T')[0];
@@ -63,7 +65,7 @@ export function CalendarView() {
     }
     
     return days;
-  }, [currentDate]);
+  }, [currentDate, scheduledPosts]);
 
   const navigateMonth = (direction: number) => {
     setCurrentDate(prev => {
