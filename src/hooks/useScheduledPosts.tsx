@@ -109,3 +109,29 @@ export function useDeletePost() {
     }
   });
 }
+
+/**
+ * Real posts adapted to the calendar card shape (one entry per network).
+ * Replaces the old mock list used by the calendar, day timeline and network stats.
+ */
+export function useCalendarPosts() {
+  const query = useScheduledPosts();
+  const posts: CalendarPost[] = (query.data || [])
+    .filter((p) => p.status !== 'cancelled')
+    .flatMap((p) => {
+      const d = new Date(p.scheduled_at);
+      const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      return p.networks.map((network) => ({
+        id: `${p.id}-${network}`,
+        content: p.content,
+        network: network as CalendarPost['network'],
+        scheduledDate: d,
+        scheduledTime: time,
+        status: (p.status === 'published' ? 'published' : 'scheduled') as CalendarPost['status'],
+        imageUrl: p.media_urls?.[0],
+      }));
+    });
+  return { ...query, posts };
+}
+
+type CalendarPost = import('@/data/mockData').ScheduledPost;

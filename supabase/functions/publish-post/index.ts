@@ -1,28 +1,5 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Use dedicated encryption key, fall back to service role key
-const ENCRYPTION_KEY = Deno.env.get('TOKEN_ENCRYPTION_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-
-function decryptToken(encryptedToken: string): string {
-  if (!ENCRYPTION_KEY) {
-    throw new Error('Encryption key not configured');
-  }
-  const encoder = new TextEncoder();
-  const key = encoder.encode(ENCRYPTION_KEY.padEnd(32, '0').slice(0, 32));
-  const encrypted = Uint8Array.from(atob(encryptedToken), c => c.charCodeAt(0));
-  
-  const decrypted = new Uint8Array(encrypted.length);
-  for (let i = 0; i < encrypted.length; i++) {
-    decrypted[i] = encrypted[i] ^ key[i % key.length];
-  }
-  
-  return new TextDecoder().decode(decrypted);
-}
+import { createClient } from 'npm:@supabase/supabase-js@2';
+import { corsHeaders, decryptToken, getUserId } from '../_shared/security.ts';
 
 // Check if token is expired
 function isTokenExpired(expiresAt: string | null): boolean {
@@ -443,40 +420,27 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Authenticate request using JWT from Authorization header
-    const authHeader = req.headers.get('Authorization');
-    let authenticatedUserId: string | null = null;
-    
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.replace('Bearer ', '');
-      const { data: claims, error: authError } = await supabase.auth.getUser(token);
-      
-      if (!authError && claims?.user) {
-        authenticatedUserId = claims.user.id;
-      }
+    // SECURITY: a valid user JWT is mandatory. No anonymous path.
+    const authenticatedUserId = await getUserId(req, supabase);
+    if (!authenticatedUserId) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Get post data
+    // Ownership is enforced in the query itself
     const { data: post, error: postError } = await supabase
       .from('scheduled_posts')
       .select('*')
       .eq('id', postId)
-      .single();
+      .eq('user_id', authenticatedUserId)
+      .maybeSingle();
 
     if (postError || !post) {
-      console.error('Post not found:', postId, postError);
       return new Response(
         JSON.stringify({ error: 'Post not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // If authenticated, verify ownership
-    if (authenticatedUserId && post.user_id !== authenticatedUserId) {
-      console.error('Unauthorized access attempt:', authenticatedUserId, post.user_id);
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -484,6 +448,30 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: `Post is not in scheduled status (current: ${post.status})` }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Atomic claim: prevents double publishing on concurrent calls
+    const { data: claimed, error: claimError } = await supabase
+      .from('scheduled_posts')
+      .update({ status: 'processing', updated_at: new Date().toISOString() })
+      .eq('id', postId)
+      .eq('user_id', authenticatedUserId)
+      .eq('status', 'scheduled')
+      .select('id')
+      .maybeSingle();
+
+    if (claimError) {
+      console.error('Claim failed:', claimError.code);
+      return new Response(
+        JSON.stringify({ error: 'Publicação indisponível: migração de banco pendente (status "processing").' }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    if (!claimed) {
+      return new Response(
+        JSON.stringify({ error: 'Post já está sendo processado' }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -551,7 +539,7 @@ Deno.serve(async (req) => {
       }
 
       try {
-        const accessToken = decryptToken(connection.access_token_encrypted);
+        const accessToken = await decryptToken(connection.access_token_encrypted);
         let result;
 
         switch (network) {

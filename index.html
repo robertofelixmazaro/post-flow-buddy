@@ -3,39 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Agendasaas - Agendador de Posts para Redes Sociais</title>
-    <meta name="description" content="Agende posts para múltiplas redes sociais, visualize seu calendário editorial e otimize horários de publicação. Instagram, Facebook, Twitter e LinkedIn." />
-    <meta name="author" content="Agendasaas" />
-    <meta name="theme-color" content="#02f71f" />
+    <title>Agenda Plus - Agendamento inteligente de posts</title>
+    <meta name="description" content="Agenda Plus: plataforma de agendamento inteligente de posts para Facebook, Instagram, TikTok e LinkedIn, com calendário editorial." />
+    <meta name="author" content="Agenda Plus" />
+    <meta name="theme-color" content="#0d1117" />
 
-    <meta property="og:title" content="Agendasaas - Agendador de Posts" />
-    <meta property="og:description" content="Agende posts para múltiplas redes sociais e otimize sua presença digital." />
+    <meta property="og:title" content="Agenda Plus - Agendamento inteligente" />
+    <meta property="og:description" content="Plataforma de agendamento de posts para Facebook, Instagram, TikTok e LinkedIn." />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@agendasaas" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta name="twitter:title" content="Agenda Plus - Agendamento inteligente" />
+    <meta name="twitter:description" content="Plataforma de agendamento de posts para Facebook, Instagram, TikTok e LinkedIn." />
   </head>
 
   <body>
     <div id="fb-root"></div>
     <script>
-      // Facebook App ID - this is a PUBLIC value, safe to include here
-      window.__FB_APP_ID__ = '681638807610238';
-      
+      // Loads the Facebook JS SDK only. Initialization (FB.init) happens in the app
+      // with the App ID provided by the backend configuration.
       window.fbAsyncInit = function() {
-        if (window.FB && window.__FB_APP_ID__) {
-          FB.init({
-            appId: window.__FB_APP_ID__,
-            cookie: true,
-            xfbml: true,
-            version: 'v18.0'
-          });
-          FB.AppEvents.logPageView();
-          console.log('Facebook SDK initialized with App ID:', window.__FB_APP_ID__);
-          window.dispatchEvent(new Event('fb-sdk-ready'));
-        }
+        window.dispatchEvent(new Event('fb-sdk-ready'));
       };
       (function(d, s, id) {
         var js, fjs = d.getElementsByTagName(s)[0];
