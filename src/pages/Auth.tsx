@@ -345,7 +345,7 @@ export default function Auth() {
           <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mb-4">
             <Zap className="w-10 h-10 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Agendasaas</h1>
+          <h1 className="text-2xl font-bold text-foreground">Agenda Plus</h1>
           <p className="text-muted-foreground mt-1">
             {isLogin ? 'Entre na sua conta' : 'Crie sua conta'}
           </p>
