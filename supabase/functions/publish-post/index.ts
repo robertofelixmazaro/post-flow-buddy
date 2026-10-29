@@ -1,28 +1,5 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Use dedicated encryption key, fall back to service role key
-const ENCRYPTION_KEY = Deno.env.get('TOKEN_ENCRYPTION_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-
-function decryptToken(encryptedToken: string): string {
-  if (!ENCRYPTION_KEY) {
-    throw new Error('Encryption key not configured');
-  }
-  const encoder = new TextEncoder();
-  const key = encoder.encode(ENCRYPTION_KEY.padEnd(32, '0').slice(0, 32));
-  const encrypted = Uint8Array.from(atob(encryptedToken), c => c.charCodeAt(0));
-  
-  const decrypted = new Uint8Array(encrypted.length);
-  for (let i = 0; i < encrypted.length; i++) {
-    decrypted[i] = encrypted[i] ^ key[i % key.length];
-  }
-  
-  return new TextDecoder().decode(decrypted);
-}
+import { createClient } from 'npm:@supabase/supabase-js@2';
+import { corsHeaders, decryptToken, getUserId } from '../_shared/security.ts';
 
 // Check if token is expired
 function isTokenExpired(expiresAt: string | null): boolean {
