@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useQueryClient } from '@tanstack/react-query';
-import { oauthConfig } from '@/config/oauth';
+import { useOAuthConfig } from './useSocialConnections';
 
 declare global {
   interface Window {
@@ -73,8 +73,9 @@ export function useFacebookSDK() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Use centralized OAuth config
-  const appId = oauthConfig.facebook.appId;
+  // Public Meta App ID comes from the backend configuration (single source of truth)
+  const { data: oauthCfg } = useOAuthConfig();
+  const appId = oauthCfg?.facebookAppId || '';
 
   useEffect(() => {
     if (!appId) {
@@ -365,51 +366,25 @@ export function useFacebookSDK() {
   }) => {
     if (!user) throw new Error('User not authenticated');
 
-    // Use same encryption key as oauth-callback for consistency
-    const encryptToken = (token: string): string => {
-      // Use SUPABASE_PUBLISHABLE_KEY as shared key (available in both frontend and backend)
-      const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'lovable-social-key';
-      const paddedKey = key.padEnd(32, '0').slice(0, 32);
-      let result = '';
-      for (let i = 0; i < token.length; i++) {
-        result += String.fromCharCode(token.charCodeAt(i) ^ paddedKey.charCodeAt(i % paddedKey.length));
-      }
-      return btoa(result);
-    };
-
-    const tokenExpiresAt = new Date(Date.now() + data.expiresIn * 1000).toISOString();
-
-    console.log('Saving social connection:', { 
-      network: data.network, 
-      accountId: data.accountId,
-      pageId: data.pageId 
+    // The backend validates the token with Meta and stores it encrypted.
+    const { data: res, error } = await supabase.functions.invoke('save-meta-connection', {
+      body: {
+        network: data.network,
+        pageId: data.pageId,
+        pageAccessToken: data.accessToken,
+        instagramAccountId: data.network === 'instagram' ? data.accountId : undefined,
+      },
     });
 
-    const { error: dbError } = await supabase
-      .from('social_connections')
-      .upsert({
-        user_id: user.id,
-        network: data.network,
-        account_id: data.accountId,
-        account_name: data.accountName || null,
-        account_username: data.accountUsername || null,
-        page_id: data.pageId || null,
-        page_name: data.pageName || null,
-        access_token_encrypted: encryptToken(data.accessToken),
-        token_expires_at: tokenExpiresAt,
-        connected_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'user_id,network,account_id'
-      });
-
-    if (dbError) {
-      console.error('Error saving connection:', dbError);
-      throw new Error(`Erro ao salvar conexão: ${dbError.message}`);
+    if (error || !res?.success) {
+      let msg = res?.error || error?.message || 'Erro ao salvar conexão';
+      try {
+        const ctx = await (error as any)?.context?.json?.();
+        if (ctx?.error) msg = ctx.error;
+      } catch { /* ignore */ }
+      throw new Error(msg);
     }
 
-    console.log('Social connection saved successfully');
-    // Invalidate queries to refresh the connections list
     queryClient.invalidateQueries({ queryKey: ['social-connections'] });
   };
 
