@@ -539,7 +539,7 @@ Deno.serve(async (req) => {
       }
 
       try {
-        const accessToken = decryptToken(connection.access_token_encrypted);
+        const accessToken = await decryptToken(connection.access_token_encrypted);
         let result;
 
         switch (network) {
