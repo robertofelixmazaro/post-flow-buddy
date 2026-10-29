@@ -357,6 +357,9 @@ export default function CreatePost() {
                   <p className="text-xs text-muted-foreground">
                     Selecione os dias da semana para publicar o mesmo post
                   </p>
+                  <p className="text-xs text-amber-500">
+                    Em breve: a repetição ainda não é salva. Por enquanto, só o post da data escolhida é agendado.
+                  </p>
                   <div className="flex flex-wrap gap-2">
                     {weekDays.map(day => {
                       const isSelected = repeatOnDays.includes(day.id);
