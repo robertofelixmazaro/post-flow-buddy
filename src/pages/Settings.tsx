@@ -447,7 +447,7 @@ export default function Settings() {
               <div className="bg-card rounded-2xl border border-border p-6">
                 <h2 className="text-lg font-semibold text-foreground mb-4">Melhores Horários</h2>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Configure os horários preferidos para publicação automática
+                  Sugestões gerais de horários (não baseadas nos seus dados). Horários personalizados exigirão métricas reais das redes.
                 </p>
                 <div className="space-y-3">
                   {bestTimes.map(day => (
